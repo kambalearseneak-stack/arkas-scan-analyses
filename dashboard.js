@@ -2,7 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebas
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBXCrhc36mChTf77Ki2FER_z-2Ti0NPQ3A",
+  apiKey: "AIzaSyBXCrhc36mCHtTf7KiZEER_z-2IioNPQ3A",
   authDomain: "arkas-scan-analyses.firebaseapp.com",
   projectId: "arkas-scan-analyses",
   storageBucket: "arkas-scan-analyses.firebasestorage.app",
@@ -170,4 +170,5 @@ function analyserGraphiqueSMC() {
       </div>
     </div>
   `;
-}
+  }
+            

@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
+// Configuration Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyBXCrhc36mCHtTf7KiZEER_z-2IioNPQ3A",
   authDomain: "arkas-scan-analyses.firebaseapp.com",
@@ -13,8 +14,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-// Ta clé d'autorisation Gemini (Format AQ.)
-const GEMINI_API_KEY = "AQ.Ab8RN6KpDzP_kUB1bNvmRtGZZoVUA5STlhoMcHDF_o2wEO77cw"; 
+// Clé API Gemini
+const GEMINI_API_KEY = "AQ.Ab8RN6KpDzP_kUB1bNvmRtGZZoVUA5STlhoMcHDF_o2wEO77cw";
 
 let base64Image = null;
 
@@ -28,6 +29,7 @@ onAuthStateChanged(auth, (user) => {
   }
 });
 
+// Déconnexion
 const logoutBtn = document.getElementById('logout-btn');
 if (logoutBtn) {
   logoutBtn.addEventListener('click', () => {
@@ -46,8 +48,8 @@ if (chartFileInput) {
     if (file) {
       const reader = new FileReader();
       reader.onload = function(event) {
-        imagePreview.src = event.target.result;
-        previewContainer.classList.remove('hidden');
+        if (imagePreview) imagePreview.src = event.target.result;
+        if (previewContainer) previewContainer.classList.remove('hidden');
         base64Image = event.target.result.split(',')[1];
       };
       reader.readAsDataURL(file);
@@ -83,9 +85,9 @@ if (analyzeBtn && resultsContent) {
   });
 }
 
+// Appel à l'API Gemini Vision avec les paramètres mis à jour (v1 + gemini-2.5-flash)
 async function appelerGeminiVision(base64Data) {
-  // Transmission compatible avec le format de clé AQ.
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
   
   const prompt = `Tu es un expert en trading Smart Money Concepts (SMC). Analyse précisément ce graphique.
 Retourne UNIQUEMENT un objet JSON valide sans balises Markdown ou texte autour, sous ce format exact :
@@ -105,8 +107,7 @@ Retourne UNIQUEMENT un objet JSON valide sans balises Markdown ou texte autour, 
   const response = await fetch(url, {
     method: 'POST',
     headers: { 
-      'Content-Type': 'application/json',
-      'x-goog-api-key': GEMINI_API_KEY // Compatibilité supplémentaire pour clés AQ.
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify({
       contents: [{
@@ -125,8 +126,9 @@ Retourne UNIQUEMENT un objet JSON valide sans balises Markdown ou texte autour, 
   return JSON.parse(rawText);
 }
 
+// Affichage du rapport dans l'interface UI
 function afficherRapportIA(data) {
-  const isBullish = data.direction.includes("BUY");
+  const isBullish = data.direction && data.direction.includes("BUY");
 
   resultsContent.innerHTML = `
     <div class="smc-report">

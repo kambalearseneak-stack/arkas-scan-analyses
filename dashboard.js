@@ -1,7 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-// Configuration Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyBXCrhc36mCHtTf7KiZEER_z-2IioNPQ3A",
   authDomain: "arkas-scan-analyses.firebaseapp.com",
@@ -14,12 +13,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-// Clé API Gemini
+// Clé Gemini
 const GEMINI_API_KEY = "AQ.Ab8RN6KpDzP_kUB1bNvmRtGZZoVUA5STlhoMcHDF_o2wEO77cw";
 
 let base64Image = null;
 
-// Vérification de la session utilisateur
+// Vérification de la session
 onAuthStateChanged(auth, (user) => {
   if (user) {
     const userEmailElement = document.getElementById('user-email');
@@ -29,7 +28,6 @@ onAuthStateChanged(auth, (user) => {
   }
 });
 
-// Déconnexion
 const logoutBtn = document.getElementById('logout-btn');
 if (logoutBtn) {
   logoutBtn.addEventListener('click', () => {
@@ -37,7 +35,7 @@ if (logoutBtn) {
   });
 }
 
-// Prévisualisation et conversion de l'image en Base64
+// Image preview
 const chartFileInput = document.getElementById('chart-file');
 const previewContainer = document.getElementById('preview-container');
 const imagePreview = document.getElementById('image-preview');
@@ -57,7 +55,7 @@ if (chartFileInput) {
   });
 }
 
-// Lancement du scan visuel par l'IA
+// Anayser
 const analyzeBtn = document.getElementById('analyze-btn');
 const resultsContent = document.getElementById('results-content');
 
@@ -70,8 +68,8 @@ if (analyzeBtn && resultsContent) {
 
     resultsContent.innerHTML = `
       <div style="text-align: center; padding: 2.5rem 1rem;">
-        <p style="color: #00E676; font-size: 1.1rem; font-weight: bold;">🧠 Analyse du graphique par l'IA...</p>
-        <p style="font-size: 0.85rem; color: #a0aec0; margin-top: 0.5rem;">Détection de l'actif, des niveaux exacts, OB, FVG et BOS/CHoCH...</p>
+        <p style="color: #00E676; font-size: 1.1rem; font-weight: bold;">🧠 Analyse SMC en cours...</p>
+        <p style="font-size: 0.85rem; color: #a0aec0; margin-top: 0.5rem;">Détection des structures, OB et FVG...</p>
       </div>
     `;
 
@@ -80,34 +78,35 @@ if (analyzeBtn && resultsContent) {
       afficherRapportIA(analysisData);
     } catch (error) {
       console.error(error);
-      resultsContent.innerHTML = `<p style="color: #ef4444; padding: 1rem; text-align: center;">Erreur lors de l'analyse : ${error.message}</p>`;
+      resultsContent.innerHTML = `<p style="color: #ef4444; padding: 1rem; text-align: center; word-break: break-all;">Erreur : ${error.message}</p>`;
     }
   });
 }
 
-// Appel à l'API Gemini Vision avec les paramètres mis à jour (v1 + gemini-2.5-flash)
 async function appelerGeminiVision(base64Data) {
-  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+  // Endpoint v1beta
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`;
   
   const prompt = `Tu es un expert en trading Smart Money Concepts (SMC). Analyse précisément ce graphique.
 Retourne UNIQUEMENT un objet JSON valide sans balises Markdown ou texte autour, sous ce format exact :
 {
-  "asset": "nom de l'actif (ex: GOLD, EUR/USD, US30)",
+  "asset": "nom de l'actif",
   "direction": "BUY LIMIT" ou "SELL LIMIT" ou "BUY NOW" ou "SELL NOW",
   "entry": 0.00,
   "sl": 0.00,
   "tp1": 0.00,
   "tp2": 0.00,
   "rr": "1:3.5",
-  "bos_choch": "description concise de la structure",
-  "ob": "description de l'order block identifié",
+  "bos_choch": "description de la structure",
+  "ob": "description de l'order block",
   "fvg": "description du FVG"
 }`;
 
   const response = await fetch(url, {
     method: 'POST',
     headers: { 
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'x-goog-api-key': GEMINI_API_KEY
     },
     body: JSON.stringify({
       contents: [{
@@ -120,13 +119,12 @@ Retourne UNIQUEMENT un objet JSON valide sans balises Markdown ou texte autour, 
   });
 
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error?.message || "Erreur de communication avec l'IA");
+  if (!response.ok) throw new Error(data.error?.message || "Erreur lors de l'appel API");
 
   const rawText = data.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
   return JSON.parse(rawText);
 }
 
-// Affichage du rapport dans l'interface UI
 function afficherRapportIA(data) {
   const isBullish = data.direction && data.direction.includes("BUY");
 

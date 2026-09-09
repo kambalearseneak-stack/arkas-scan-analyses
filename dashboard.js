@@ -13,8 +13,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-// Clé API Gemini configurée
-const GEMINI_API_KEY = "AIzaSyAQ.Ab8RN6KpDzP_kUB1bNvmRtGZZoVUA5STlhoMcHDF_o2wEO77cw"; 
+// Ta clé d'autorisation Gemini (Format AQ.)
+const GEMINI_API_KEY = "AQ.Ab8RN6KpDzP_kUB1bNvmRtGZZoVUA5STlhoMcHDF_o2wEO77cw"; 
 
 let base64Image = null;
 
@@ -84,6 +84,7 @@ if (analyzeBtn && resultsContent) {
 }
 
 async function appelerGeminiVision(base64Data) {
+  // Transmission compatible avec le format de clé AQ.
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
   
   const prompt = `Tu es un expert en trading Smart Money Concepts (SMC). Analyse précisément ce graphique.
@@ -103,7 +104,10 @@ Retourne UNIQUEMENT un objet JSON valide sans balises Markdown ou texte autour, 
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'x-goog-api-key': GEMINI_API_KEY // Compatibilité supplémentaire pour clés AQ.
+    },
     body: JSON.stringify({
       contents: [{
         parts: [

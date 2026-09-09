@@ -1,0 +1,98 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Intégration de ton image d'arrière-plan */
+  background: url('arkas2.jpg') no-repeat center center fixed;
+  background-size: cover;
+  position: relative;
+  color: #ffffff;
+}
+
+/* Couche d'assombrissement pour garder l'image visible et le texte lisible */
+.bg-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(10, 14, 23, 0.70);
+  z-index: 1;
+}
+
+/* Carte du formulaire */
+.login-container {
+  position: relative;
+  z-index: 2;
+  background: rgba(20, 26, 38, 0.85);
+  padding: 2.5rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  width: 90%;
+  max-width: 400px;
+  backdrop-filter: blur(8px);
+}
+
+h1 {
+  font-size: 1.6rem;
+  margin-bottom: 0.5rem;
+  color: #00E676;
+  text-align: center;
+}
+
+p {
+  font-size: 0.85rem;
+  color: #a0aec0;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.input-group {
+  margin-bottom: 1.5rem;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+  color: #e2e8f0;
+}
+
+input {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #2d3748;
+  background: #0f172a;
+  color: #fff;
+  outline: none;
+}
+
+input:focus {
+  border-color: #00E676;
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 6px;
+  background: #00E676;
+  color: #000000;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-primary:hover {
+  background: #00c853;
+}

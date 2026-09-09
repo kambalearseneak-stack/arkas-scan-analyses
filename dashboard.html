@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="dashboard-body">
+  <!-- Voile sombre d'arrière-plan -->
   <div class="bg-overlay"></div>
 
   <!-- Barre de navigation / En-tête -->
@@ -15,39 +16,47 @@
       <h2>Arkas Scan Analyses</h2>
     </div>
     <div class="user-menu">
-      <span id="user-email">Utilisateur</span>
+      <span id="user-email">Chargement...</span>
       <button id="logout-btn" class="btn-secondary">Déconnexion</button>
     </div>
   </header>
 
-  <!-- Contenu Principal -->
+  <!-- Contenu Principal du Dashboard -->
   <main class="dashboard-container">
-    <!-- Panneau d'importation d'image -->
+    
+    <!-- Section 1 : Importation et Aperçu du Graphique -->
     <section class="card upload-section">
       <h3>Scanner un Graphique SMC</h3>
-      <p>Importez votre capture de graphique (Order Block, FVG, Structure)</p>
+      <p>Importez votre capture d'écran de graphique pour détecter les structures (BOS, CHoCH, OB, FVG).</p>
       
+      <!-- Zone de dépôt d'image -->
       <div class="drop-zone" id="drop-zone">
         <input type="file" id="chart-file" accept="image/*" hidden>
         <div class="upload-icon">📊</div>
-        <p>Glissez-déposez l'image du graphique ici ou <label for="chart-file" class="browse-label">Parcourir</label></p>
+        <p>Glissez-déposez votre graphique ici ou <label for="chart-file" class="browse-label">Parcourir</label></p>
       </div>
 
+      <!-- Zone de prévisualisation -->
       <div id="preview-container" class="preview-container hidden">
         <img id="image-preview" src="" alt="Aperçu du graphique">
         <button id="analyze-btn" class="btn-primary">Lancer l'analyse SMC</button>
       </div>
     </section>
 
-    <!-- Panneau de Résultats -->
+    <!-- Section 2 : Rapport d'Analyse et Signaux -->
     <section class="card results-section">
-      <h3>Rapport d'Analyse SMC</h3>
+      <h3>Rapport & Signaux SMC</h3>
+      
       <div id="results-content" class="results-content">
-        <p class="placeholder-text">Chargez une image et lancez l'analyse pour afficher les signaux Smart Money Concepts (BOS, CHoCH, Order Blocks, Fair Value Gaps).</p>
+        <p class="placeholder-text">
+          Importez un graphique et cliquez sur <strong>"Lancer l'analyse SMC"</strong> pour générer les niveaux précis d'entrée (Entry), Stop Loss (SL) et Take Profit (TP).
+        </p>
       </div>
     </section>
+
   </main>
 
+  <!-- Script du tableau de bord (Module ES6) -->
   <script type="module" src="dashboard.js"></script>
 </body>
 </html>

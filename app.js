@@ -11,7 +11,7 @@ const firebaseConfig = {
   projectId: "arkas-scan-analyses",
   storageBucket: "arkas-scan-analyses.firebasestorage.app",
   messagingSenderId: "843762248238",
-  appId: "1:843762248238:web:43c9900b57b26671b5cdb7"
+  appId: "1:843762248238:web:43c9908b57b26671b5cdbf"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -85,6 +85,8 @@ if (loginForm) {
         msg = "Cet email est déjà utilisé. Cliquez sur 'Se connecter'.";
       } else if (error.code === 'auth/weak-password') {
         msg = "Le mot de passe doit contenir au moins 6 caractères.";
+      } else if (error.code === 'auth/api-key-not-valid') {
+        msg = "Clé API Firebase invalide. Vérifiez les paramètres dans la console Firebase.";
       }
       showError(msg);
     }

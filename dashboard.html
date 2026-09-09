@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scanner SMC - Arkas Scan Analyses</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="dashboard-body">
+  <div class="bg-overlay"></div>
+
+  <!-- Barre de navigation / En-tête -->
+  <header class="navbar">
+    <div class="logo">
+      <h2>Arkas Scan Analyses</h2>
+    </div>
+    <div class="user-menu">
+      <span id="user-email">Utilisateur</span>
+      <button id="logout-btn" class="btn-secondary">Déconnexion</button>
+    </div>
+  </header>
+
+  <!-- Contenu Principal -->
+  <main class="dashboard-container">
+    <!-- Panneau d'importation d'image -->
+    <section class="card upload-section">
+      <h3>Scanner un Graphique SMC</h3>
+      <p>Importez votre capture de graphique (Order Block, FVG, Structure)</p>
+      
+      <div class="drop-zone" id="drop-zone">
+        <input type="file" id="chart-file" accept="image/*" hidden>
+        <div class="upload-icon">📊</div>
+        <p>Glissez-déposez l'image du graphique ici ou <label for="chart-file" class="browse-label">Parcourir</label></p>
+      </div>
+
+      <div id="preview-container" class="preview-container hidden">
+        <img id="image-preview" src="" alt="Aperçu du graphique">
+        <button id="analyze-btn" class="btn-primary">Lancer l'analyse SMC</button>
+      </div>
+    </section>
+
+    <!-- Panneau de Résultats -->
+    <section class="card results-section">
+      <h3>Rapport d'Analyse SMC</h3>
+      <div id="results-content" class="results-content">
+        <p class="placeholder-text">Chargez une image et lancez l'analyse pour afficher les signaux Smart Money Concepts (BOS, CHoCH, Order Blocks, Fair Value Gaps).</p>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="dashboard.js"></script>
+</body>
+</html>

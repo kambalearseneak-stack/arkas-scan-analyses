@@ -6,7 +6,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBXCrhc36mChTf77Ki2FER_z-2Ti0NPQ3A",
+  apiKey: "AIzaSyBXCrhc36mCHtTf7KiZEER_z-2IioNPQ3A",
   authDomain: "arkas-scan-analyses.firebaseapp.com",
   projectId: "arkas-scan-analyses",
   storageBucket: "arkas-scan-analyses.firebasestorage.app",
@@ -85,8 +85,6 @@ if (loginForm) {
         msg = "Cet email est déjà utilisé. Cliquez sur 'Se connecter'.";
       } else if (error.code === 'auth/weak-password') {
         msg = "Le mot de passe doit contenir au moins 6 caractères.";
-      } else if (error.code === 'auth/api-key-not-valid') {
-        msg = "Clé API Firebase invalide. Vérifiez les paramètres dans la console Firebase.";
       }
       showError(msg);
     }

@@ -3,40 +3,172 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Arkas Scan Analyses - Connexion</title>
+
+  <title>ARKAS SCAN AI — Connexion</title>
+
+  <meta
+    name="description"
+    content="ARKAS SCAN AI - Scanner et analyser vos graphiques avec Price Action et Smart Money Concepts."
+  >
+
   <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-  <div class="login-container">
+
+  <!-- =========================================================
+       ARRIÈRE-PLAN
+  ========================================================== -->
+  <div class="bg-overlay"></div>
+
+
+  <!-- =========================================================
+       CONNEXION / INSCRIPTION
+  ========================================================== -->
+  <main class="login-container">
+
     <div class="login-card">
-      <h1 id="form-title">Arkas Scan Analyses</h1>
-      <p id="form-subtitle">Connectez-vous pour accéder à vos analyses SMC</p>
 
-      <form class="login-form">
-        <div class="form-group">
-          <label for="email">Adresse Email</label>
-          <input type="email" id="email" placeholder="votre@email.com" required>
+      <!-- Logo / titre -->
+      <div class="login-brand">
+
+        <div class="brand-icon">
+          📊
         </div>
 
-        <div class="form-group">
-          <label for="password">Mot de passe</label>
-          <input type="password" id="password" placeholder="••••••••" required>
+        <h1 id="form-title">
+          ARKAS SCAN AI
+        </h1>
+
+        <div class="version-badge">
+          V2
         </div>
 
-        <button type="submit" id="submit-btn" class="btn-primary">Se connecter</button>
-      </form>
-
-      <div style="margin-top: 15px; text-align: center;">
-        <p id="toggle-text" style="color: #a0aec0; font-size: 14px;">
-          Pas encore de compte ? 
-          <a href="#" id="toggle-mode" style="color: #00ff88; text-decoration: none; font-weight: bold;">S'inscrire</a>
-        </p>
       </div>
 
-      <p id="error-message" style="color: #ff4d4d; margin-top: 10px; font-size: 13px; text-align: center; display: none;"></p>
-    </div>
-  </div>
 
+      <!-- Sous-titre -->
+      <p id="form-subtitle" class="login-subtitle">
+        Connectez-vous pour accéder à vos analyses SMC
+      </p>
+
+
+      <!-- =====================================================
+           FORMULAIRE
+      ====================================================== -->
+      <form class="login-form" id="login-form">
+
+        <!-- Email -->
+        <div class="form-group">
+
+          <label for="email">
+            Adresse Email
+          </label>
+
+          <input
+            type="email"
+            id="email"
+            name="email"
+            placeholder="votre@email.com"
+            autocomplete="email"
+            required
+          >
+
+        </div>
+
+
+        <!-- Mot de passe -->
+        <div class="form-group">
+
+          <label for="password">
+            Mot de passe
+          </label>
+
+          <input
+            type="password"
+            id="password"
+            name="password"
+            placeholder="••••••••"
+            autocomplete="current-password"
+            minlength="6"
+            required
+          >
+
+        </div>
+
+
+        <!-- Bouton -->
+        <button
+          type="submit"
+          id="submit-btn"
+          class="btn-primary"
+        >
+          Se connecter
+        </button>
+
+      </form>
+
+
+      <!-- =====================================================
+           CHANGEMENT CONNEXION / INSCRIPTION
+      ====================================================== -->
+      <div class="toggle-container">
+
+        <p id="toggle-text">
+
+          Pas encore de compte ?
+
+          <a
+            href="#"
+            id="toggle-mode"
+          >
+            S'inscrire
+          </a>
+
+        </p>
+
+      </div>
+
+
+      <!-- =====================================================
+           MESSAGE D'ERREUR
+      ====================================================== -->
+      <div
+        id="error-message"
+        class="error-message"
+        role="alert"
+        aria-live="polite"
+      ></div>
+
+
+      <!-- =====================================================
+           INFORMATIONS
+      ====================================================== -->
+      <div class="login-footer">
+
+        <span>
+          🔒 Connexion sécurisée
+        </span>
+
+        <span>
+          •
+        </span>
+
+        <span>
+          SMC & Price Action
+        </span>
+
+      </div>
+
+    </div>
+
+  </main>
+
+
+  <!-- =========================================================
+       APPLICATION
+  ========================================================== -->
   <script type="module" src="app.js"></script>
+
 </body>
 </html>

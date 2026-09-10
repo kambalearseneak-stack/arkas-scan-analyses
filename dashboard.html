@@ -16,34 +16,20 @@
 
 <body class="dashboard-body">
 
-    <!-- =====================================================
-         ARRIÈRE-PLAN
-    ====================================================== -->
-
     <div class="bg-overlay"></div>
 
-
-    <!-- =====================================================
-         NAVBAR
-    ====================================================== -->
+    <!-- ================= NAVBAR ================= -->
 
     <header class="navbar">
 
         <div class="logo">
-
             <h2>ARKAS SCAN AI</h2>
-
             <span>V2</span>
-
         </div>
-
 
         <div class="user-menu">
 
-            <span
-                id="user-status"
-                class="header-status"
-            >
+            <span id="user-status" class="header-status">
                 Vérification...
             </span>
 
@@ -64,17 +50,12 @@
     </header>
 
 
-
-    <!-- =====================================================
-         CONTENU PRINCIPAL
-    ====================================================== -->
+    <!-- ================= CONTENU ================= -->
 
     <main class="dashboard-container">
 
 
-        <!-- =================================================
-             SCANNER
-        ================================================== -->
+        <!-- ================= SCANNER ================= -->
 
         <section class="card upload-section">
 
@@ -82,20 +63,16 @@
 
                 <div>
 
-                    <h3>
-                        Scanner un graphique
-                    </h3>
+                    <h3>Scanner un graphique</h3>
 
                     <p>
-                        Importez une capture d'écran de votre
-                        graphique. ARKAS SCAN AI analyse la
-                        structure du marché, la liquidité,
-                        les Order Blocks, les FVG, le BOS,
-                        le CHoCH et le Price Action.
+                        Importez une capture d'écran de votre graphique.
+                        ARKAS SCAN AI analyse la structure du marché,
+                        la liquidité, les Order Blocks, les FVG,
+                        le BOS, le CHoCH et le Price Action.
                     </p>
 
                 </div>
-
 
                 <div class="engine-badge">
                     ARKAS AI
@@ -104,8 +81,7 @@
             </div>
 
 
-
-            <!-- ZONE D'UPLOAD -->
+            <!-- ZONE IMPORT -->
 
             <div
                 class="drop-zone"
@@ -122,34 +98,28 @@
                     hidden
                 >
 
-
                 <div class="upload-icon">
                     📊
                 </div>
-
 
                 <h4>
                     Importer votre graphique
                 </h4>
 
-
                 <p>
                     Glissez-déposez votre capture ici
                 </p>
-
 
                 <p class="upload-or">
                     ou
                 </p>
 
-
                 <label
                     for="chart-file"
                     class="browse-label"
                 >
-                    Parcourir les fichiers
+                    📁 Parcourir les fichiers
                 </label>
-
 
                 <small>
                     JPG, PNG ou WebP — maximum 10 MB
@@ -158,10 +128,7 @@
             </div>
 
 
-
-            <!-- =================================================
-                 APERÇU
-            ================================================== -->
+            <!-- ================= APERÇU ================= -->
 
             <div
                 id="preview-container"
@@ -171,7 +138,7 @@
                 <div class="preview-header">
 
                     <h4>
-                        Aperçu du graphique
+                        👁️ Aperçu du graphique
                     </h4>
 
                     <span id="file-name">
@@ -192,27 +159,96 @@
                 </div>
 
 
-                <div class="preview-actions">
+                <!-- BOUTON SCANNER -->
+
+                <div
+                    class="preview-actions"
+                    style="
+                        display:flex;
+                        justify-content:center;
+                        align-items:center;
+                        margin-top:20px;
+                    "
+                >
 
                     <button
                         id="analyze-btn"
                         class="btn-primary"
                         type="button"
+                        disabled
+                        style="
+                            min-width:260px;
+                            min-height:52px;
+                            font-size:16px;
+                            font-weight:700;
+                            cursor:pointer;
+                        "
                     >
-                        🔍 Lancer l'analyse SMC
+                        🔍 LANCER LE SCAN
                     </button>
 
                 </div>
+
+                <p
+                    id="scan-help"
+                    style="
+                        text-align:center;
+                        margin-top:10px;
+                        opacity:.7;
+                        font-size:13px;
+                    "
+                >
+                    Sélectionnez d'abord un graphique.
+                </p>
+
+            </div>
+
+
+            <!-- ================= ACTION RAPIDE ================= -->
+
+            <div
+                class="scanner-action"
+                style="
+                    margin-top:20px;
+                    padding:18px;
+                    border-radius:14px;
+                    text-align:center;
+                    background:rgba(0,255,150,.05);
+                    border:1px solid rgba(0,255,150,.15);
+                "
+            >
+
+                <div
+                    style="
+                        font-size:13px;
+                        opacity:.75;
+                        margin-bottom:10px;
+                    "
+                >
+                    🚀 PRÊT POUR L'ANALYSE ?
+                </div>
+
+                <button
+                    id="scan-main-btn"
+                    class="btn-primary"
+                    type="button"
+                    disabled
+                    style="
+                        min-width:260px;
+                        min-height:50px;
+                        font-size:16px;
+                        font-weight:700;
+                    "
+                >
+                    🔎 SCANNER LE GRAPHIQUE
+                </button>
 
             </div>
 
         </section>
 
 
-
-        <!-- =================================================
-             RESULTATS
-        ================================================== -->
+        <!-- ================= RESULTATS ================= -->
 
         <section class="card results-section">
 
@@ -230,7 +266,6 @@
 
                 </div>
 
-
                 <div
                     id="analysis-status"
                     class="analysis-status"
@@ -240,11 +275,6 @@
 
             </div>
 
-
-
-            <!-- =================================================
-                 CONTENEUR DES RESULTATS
-            ================================================== -->
 
             <div
                 id="results-content"
@@ -257,66 +287,31 @@
                         📈
                     </div>
 
-
                     <h4>
                         Aucun graphique analysé
                     </h4>
 
-
                     <p>
                         Importez un graphique puis cliquez sur
                         <strong>
-                            "Lancer l'analyse SMC"
+                            "LANCER LE SCAN"
                         </strong>
                         pour obtenir :
                     </p>
 
-
                     <ul class="analysis-list">
 
-                        <li>
-                            Direction BUY / SELL / WAIT
-                        </li>
-
-                        <li>
-                            Score ARKAS /100
-                        </li>
-
-                        <li>
-                            Entry
-                        </li>
-
-                        <li>
-                            Stop Loss
-                        </li>
-
-                        <li>
-                            Take Profit
-                        </li>
-
-                        <li>
-                            BOS / CHoCH
-                        </li>
-
-                        <li>
-                            Order Block
-                        </li>
-
-                        <li>
-                            Fair Value Gap
-                        </li>
-
-                        <li>
-                            Liquidité
-                        </li>
-
-                        <li>
-                            Confirmation Price Action
-                        </li>
-
-                        <li>
-                            Risk / Reward
-                        </li>
+                        <li>Direction BUY / SELL / WAIT</li>
+                        <li>Score ARKAS /100</li>
+                        <li>Entry</li>
+                        <li>Stop Loss</li>
+                        <li>Take Profit 1 / 2</li>
+                        <li>Risk / Reward</li>
+                        <li>BOS / CHoCH</li>
+                        <li>Order Block</li>
+                        <li>Fair Value Gap</li>
+                        <li>Liquidité</li>
+                        <li>Price Action</li>
 
                     </ul>
 
@@ -327,10 +322,7 @@
         </section>
 
 
-
-        <!-- =================================================
-             METHODE
-        ================================================== -->
+        <!-- ================= METHODE ================= -->
 
         <section class="card method-section">
 
@@ -338,9 +330,7 @@
                 Comment fonctionne ARKAS SCAN AI ?
             </h3>
 
-
             <div class="method-grid">
-
 
                 <div class="method-item">
 
@@ -358,7 +348,6 @@
                     </p>
 
                 </div>
-
 
 
                 <div class="method-item">
@@ -379,7 +368,6 @@
                 </div>
 
 
-
                 <div class="method-item">
 
                     <div class="method-icon">
@@ -392,12 +380,10 @@
 
                     <p>
                         Identification des Order Blocks et
-                        Fair Value Gaps pouvant servir de
-                        zones d'intérêt.
+                        Fair Value Gaps.
                     </p>
 
                 </div>
-
 
 
                 <div class="method-item">
@@ -417,16 +403,12 @@
 
                 </div>
 
-
             </div>
 
         </section>
 
 
-
-        <!-- =================================================
-             AVERTISSEMENT
-        ================================================== -->
+        <!-- ================= AVERTISSEMENT ================= -->
 
         <section class="risk-notice">
 
@@ -445,44 +427,124 @@
 
         </section>
 
-
     </main>
 
 
-
-    <!-- =====================================================
-         SCRIPTS
-    ====================================================== -->
-
-    <!--
-        IMPORTANT :
-        app.js gère Firebase :
-        - protection du dashboard
-        - utilisateur connecté
-        - email
-        - déconnexion
-    -->
+    <!-- ================= SCRIPTS ================= -->
 
     <script
         type="module"
         src="app.js"
     ></script>
 
-
-    <!--
-        dashboard.js gère :
-        - import du graphique
-        - aperçu
-        - envoi vers Vercel
-        - analyse Gemini
-        - affichage du résultat
-    -->
-
     <script
         type="module"
         src="dashboard.js"
     ></script>
 
+
+    <!-- ================= ACTIVATION DU BOUTON ================= -->
+
+    <script>
+
+        document.addEventListener("DOMContentLoaded", () => {
+
+            const fileInput =
+                document.getElementById("chart-file");
+
+            const analyzeBtn =
+                document.getElementById("analyze-btn");
+
+            const scanMainBtn =
+                document.getElementById("scan-main-btn");
+
+            const previewContainer =
+                document.getElementById("preview-container");
+
+            const scanHelp =
+                document.getElementById("scan-help");
+
+
+            function updateScanButtons() {
+
+                const hasImage =
+                    fileInput &&
+                    fileInput.files &&
+                    fileInput.files.length > 0;
+
+
+                if (analyzeBtn) {
+
+                    analyzeBtn.disabled = !hasImage;
+
+                    analyzeBtn.style.opacity =
+                        hasImage ? "1" : ".5";
+
+                }
+
+
+                if (scanMainBtn) {
+
+                    scanMainBtn.disabled = !hasImage;
+
+                    scanMainBtn.style.opacity =
+                        hasImage ? "1" : ".5";
+
+                }
+
+
+                if (scanHelp) {
+
+                    scanHelp.textContent = hasImage
+                        ? "Graphique prêt. Cliquez sur SCANNER pour lancer l'analyse."
+                        : "Sélectionnez d'abord un graphique.";
+
+                }
+
+            }
+
+
+            if (fileInput) {
+
+                fileInput.addEventListener(
+                    "change",
+                    updateScanButtons
+                );
+
+            }
+
+
+            /*
+             * Le bouton principal déclenche
+             * le même bouton utilisé par dashboard.js.
+             */
+
+            if (scanMainBtn) {
+
+                scanMainBtn.addEventListener(
+                    "click",
+                    () => {
+
+                        if (
+                            analyzeBtn &&
+                            !analyzeBtn.disabled
+                        ) {
+
+                            analyzeBtn.click();
+
+                        }
+
+                    }
+                );
+
+            }
+
+
+            updateScanButtons();
+
+        });
+
+    </script>
 
 </body>
 </html>

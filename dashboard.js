@@ -1,124 +1,138 @@
 // ============================================================
 // CONFIGURATION DU PROXY SÉCURISÉ (VERCEL)
 // ============================================================
-const PROXY_API_URL = "https://votre-projet.vercel.app/api/analyze";
+const PROXY_API_URL = "https://arkas-scan-analyses.vercel.app/api/analyze";
 
-// ============================================================
-// PREVISUALISATION DE L'IMAGE LORS DE LA SÉLECTION
-// ============================================================
-const chartInput = document.getElementById('chartInput');
-const imagePreview = document.getElementById('imagePreview'); // L'élément <img> pour afficher l'image
+document.addEventListener('DOMContentLoaded', () => {
+  // Masquer le texte "Chargement..." s'il reste bloqué
+  const loadingStatus = document.getElementById('user-status') || document.querySelector('.header-status');
+  if (loadingStatus) loadingStatus.style.display = 'none';
 
-if (chartInput) {
-  chartInput.addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = function(event) {
-        if (imagePreview) {
-          imagePreview.src = event.target.result;
-          imagePreview.style.display = 'block'; // Affiche l'image
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  });
-}
+  // Récupération des éléments du DOM
+  const dropZone = document.querySelector('.upload-zone') || document.querySelector('.border-dashed');
+  const fileInput = document.getElementById('chartInput') || document.querySelector('input[type="file"]');
+  const scanBtn = document.getElementById('scanBtn') || document.querySelector('button[type="submit"]');
+  const outputContainer = document.getElementById('analysisOutput') || document.querySelector('.report-container');
 
-// ============================================================
-// FONCTION D'ANALYSE ET ENVOI AU PROXY
-// ============================================================
-async function analyzeChartSMC(base64Image, customPrompt) {
-  const defaultPrompt = "Analyse ce graphique de trading selon la stratégie Smart Money Concepts (SMC). " +
-                        "Identifie les Order Blocks (OB), Fair Value Gaps (FVG), Liquidity Sweeps, BOS et CHoCH. " +
-                        "Fournis un plan de trade avec point d'entrée, Stop Loss et Take Profit.";
+  let selectedFile = null;
 
-  const promptToSend = customPrompt || defaultPrompt;
+  // 1. GESTION DU CLIC ET SELECTION DE FICHIER
+  if (dropZone && fileInput) {
+    dropZone.addEventListener('click', () => fileInput.click());
 
-  showLoader(true);
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        handleFileSelect(e.target.files[0]);
+      }
+    });
+  }
 
-  try {
-    const response = await fetch(PROXY_API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        imageBase64: base64Image,
-        prompt: promptToSend
-      })
+  // 2. GESTION DU DRAG & DROP
+  if (dropZone) {
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, preventDefaults, false);
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `Erreur serveur: ${response.status}`);
+    function preventDefaults(e) {
+      e.preventDefault();
+      e.stopPropagation();
     }
 
-    const data = await response.json();
-    
-    if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-      const analysisResult = data.candidates[0].content.parts[0].text;
-      displayResults(analysisResult);
-    } else {
-      throw new Error("Réponse vide du modèle.");
-    }
-
-  } catch (error) {
-    console.error("Erreur lors de l'analyse :", error);
-    displayError("Impossible de réaliser l'analyse : " + error.message);
-  } finally {
-    showLoader(false);
+    dropZone.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      if (files && files[0]) {
+        handleFileSelect(files[0]);
+      }
+    });
   }
-}
 
-// ============================================================
-// CONVERSION FILE TO BASE64 ET SOUMISSION
-// ============================================================
-function convertFileToBase64(file) {
-  return new Promise((resolve, reject) => {
+  // 3. AFFICHAGE DE LA PREVISUALISATION DANS LA ZONE
+  function handleFileSelect(file) {
+    selectedFile = file;
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(',')[1]);
-    reader.onerror = error => reject(error);
-    reader.readAsDataURL(file);
-  });
-}
 
-document.getElementById('scanForm')?.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  
-  if (!chartInput || !chartInput.files[0]) {
-    alert("Veuillez sélectionner une image avant de lancer le scan.");
-    return;
+    reader.onload = (e) => {
+      dropZone.innerHTML = `
+        <img src="${e.target.result}" style="max-width: 100%; max-height: 180px; border-radius: 8px; object-fit: contain;" />
+        <p style="color: #4ed9a2; font-size: 12px; margin-top: 8px;">✓ Image prête pour le scan (Cliquer pour changer)</p>
+      `;
+    };
+
+    reader.readAsDataURL(file);
   }
 
-  try {
-    const file = chartInput.files[0];
-    const base64Image = await convertFileToBase64(file);
-    const promptInput = document.getElementById('promptInput');
-    const promptText = promptInput ? promptInput.value : "";
+  // 4. SOUMISSION DU SCAN
+  if (scanBtn) {
+    scanBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
 
-    await analyzeChartSMC(base64Image, promptText);
-  } catch (err) {
-    displayError("Erreur lors du traitement du fichier.");
+      if (!selectedFile) {
+        alert("Veuillez sélectionner ou glisser-déposer une image avant de lancer l'analyse.");
+        return;
+      }
+
+      showLoader(true);
+
+      try {
+        const base64Image = await convertFileToBase64(selectedFile);
+        
+        const response = await fetch(PROXY_API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageBase64: base64Image,
+            prompt: "Analyse ce graphique de trading selon la stratégie Smart Money Concepts (SMC). Identifie les Order Blocks (OB), Fair Value Gaps (FVG), Liquidity Sweeps, BOS et CHoCH. Fournis un plan de trade précis avec Entry, Stop Loss (SL) et Take Profit (TP)."
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Erreur serveur (${response.status})`);
+        }
+
+        const data = await response.json();
+        
+        if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+          displayResults(data.candidates[0].content.parts[0].text);
+        } else {
+          throw new Error("Réponse vide de l'analyseur.");
+        }
+
+      } catch (error) {
+        console.error("Erreur de scan :", error);
+        displayError(error.message);
+      } finally {
+        showLoader(false);
+      }
+    });
+  }
+
+  // UTILITAIRES
+  function convertFileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = err => reject(err);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function showLoader(isLoading) {
+    if (scanBtn) {
+      scanBtn.disabled = isLoading;
+      scanBtn.innerText = isLoading ? "Analyse SMC en cours..." : "Lancer l'analyse SMC";
+    }
+  }
+
+  function displayResults(text) {
+    if (outputContainer) {
+      outputContainer.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : `<pre style="white-space: pre-wrap;">${text}</pre>`;
+    }
+  }
+
+  function displayError(msg) {
+    if (outputContainer) {
+      outputContainer.innerHTML = `<div style="color: #ff5555; background: rgba(255,0,0,0.1); padding: 12px; border-radius: 6px;">⚠️ ${msg}</div>`;
+    }
   }
 });
-
-// ============================================================
-// AFFICHAGE ET ÉTATS DE L'INTERFACE
-// ============================================================
-function showLoader(isLoading) {
-  const loader = document.getElementById('loadingSpinner');
-  if (loader) loader.style.display = isLoading ? 'block' : 'none';
-}
-
-function displayResults(text) {
-  const outputContainer = document.getElementById('analysisOutput');
-  if (outputContainer) {
-    outputContainer.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : `<pre>${text}</pre>`;
-  }
-}
-
-function displayError(errorMessage) {
-  const outputContainer = document.getElementById('analysisOutput');
-  if (outputContainer) {
-    outputContainer.innerHTML = `<div style="color: red; font-weight: bold;">⚠️ ${errorMessage}</div>`;
-  }
-}

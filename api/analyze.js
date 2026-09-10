@@ -1,1355 +1,672 @@
 // ============================================================
 // ARKAS SCAN AI V2
-// FRONTEND JAVASCRIPT
+// api/analyze.js
+// Proxy sécurisé Vercel -> Gemini Vision
 // ============================================================
 
-// ============================================================
-// CONFIGURATION
-// ============================================================
+export default async function handler(req, res) {
 
-const PROXY_API_URL =
-  "https://arkas-scan-analyses.vercel.app/api/analyze";
+  // ------------------------------------------------------------
+  // CORS
+  // ------------------------------------------------------------
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-document.addEventListener("DOMContentLoaded", () => {
-
-  console.log("🚀 ARKAS SCAN AI V2 chargé");
-
-  // ----------------------------------------------------------
-  // RÉCUPÉRATION DES ÉLÉMENTS
-  // ----------------------------------------------------------
-
-  const dropZone =
-    document.querySelector(".upload-zone") ||
-    document.querySelector(".border-dashed") ||
-    document.getElementById("dropZone");
-
-  const fileInput =
-    document.getElementById("chartInput") ||
-    document.getElementById("chart-file") ||
-    document.querySelector('input[type="file"]');
-
-  const scanBtn =
-    document.getElementById("scanBtn") ||
-    document.getElementById("analyze-btn") ||
-    document.querySelector('button[type="submit"]');
-
-  const outputContainer =
-    document.getElementById("analysisOutput") ||
-    document.getElementById("results-content") ||
-    document.querySelector(".report-container");
-
-  console.log("Drop zone :", dropZone);
-  console.log("File input :", fileInput);
-  console.log("Scan button :", scanBtn);
-  console.log("Output :", outputContainer);
-
-  // ----------------------------------------------------------
-  // VÉRIFICATION DU HTML
-  // ----------------------------------------------------------
-
-  if (!fileInput) {
-    console.error(
-      "❌ Impossible de trouver l'input fichier."
-    );
-
-    showError(
-      "Le sélecteur d'image n'est pas correctement configuré dans la page."
-    );
-
-    return;
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
   }
 
-  if (!scanBtn) {
-    console.error(
-      "❌ Impossible de trouver le bouton d'analyse."
-    );
-  }
-
-  // ----------------------------------------------------------
-  // VARIABLES
-  // ----------------------------------------------------------
-
-  let selectedFile = null;
-  let selectedBase64 = null;
-
-  // ----------------------------------------------------------
-  // CONFIGURATION INPUT
-  // ----------------------------------------------------------
-
-  fileInput.accept = "image/jpeg,image/png,image/webp";
-  fileInput.removeAttribute("multiple");
-
-  // ----------------------------------------------------------
-  // CLIC SUR LA ZONE
-  // ----------------------------------------------------------
-
-  if (dropZone) {
-
-    dropZone.addEventListener("click", (event) => {
-
-      // Si l'utilisateur clique directement sur l'input,
-      // on ne déclenche pas un deuxième clic.
-      if (event.target === fileInput) {
-        return;
-      }
-
-      fileInput.click();
+  if (req.method !== "POST") {
+    return res.status(405).json({
+      success: false,
+      error: "Méthode non autorisée. Utilisez POST."
     });
+  }
 
-    // --------------------------------------------------------
-    // DRAG & DROP
-    // --------------------------------------------------------
+  try {
 
-    [
-      "dragenter",
-      "dragover"
-    ].forEach(eventName => {
+    // ----------------------------------------------------------
+    // VARIABLES
+    // ----------------------------------------------------------
+    const {
+      imageBase64,
+      prompt = "",
+      mimeType = "image/jpeg"
+    } = req.body || {};
 
-      dropZone.addEventListener(eventName, (event) => {
+    const apiKey = process.env.GEMINI_API_KEY;
 
-        event.preventDefault();
-        event.stopPropagation();
-
-        dropZone.classList.add("drag-active");
+    // ----------------------------------------------------------
+    // VÉRIFICATION CLÉ API
+    // ----------------------------------------------------------
+    if (!apiKey) {
+      return res.status(500).json({
+        success: false,
+        error: "GEMINI_API_KEY est absente des variables d'environnement Vercel."
       });
-    });
-
-    [
-      "dragleave",
-      "drop"
-    ].forEach(eventName => {
-
-      dropZone.addEventListener(eventName, (event) => {
-
-        event.preventDefault();
-        event.stopPropagation();
-
-        dropZone.classList.remove("drag-active");
-      });
-    });
-
-    dropZone.addEventListener("drop", (event) => {
-
-      const files = event.dataTransfer.files;
-
-      if (!files || !files.length) {
-        return;
-      }
-
-      processSelectedFile(files[0]);
-    });
-  }
-
-  // ----------------------------------------------------------
-  // SÉLECTION CLASSIQUE
-  // ----------------------------------------------------------
-
-  fileInput.addEventListener("change", (event) => {
-
-    console.log("📁 Fichier sélectionné");
-
-    const files = event.target.files;
-
-    if (!files || !files.length) {
-      console.warn("Aucun fichier sélectionné.");
-      return;
     }
 
-    processSelectedFile(files[0]);
-  });
+    // ----------------------------------------------------------
+    // VÉRIFICATION IMAGE
+    // ----------------------------------------------------------
+    if (!imageBase64 || typeof imageBase64 !== "string") {
+      return res.status(400).json({
+        success: false,
+        error: "Aucune image valide n'a été reçue."
+      });
+    }
 
-  // ==========================================================
-  // TRAITEMENT DU FICHIER
-  // ==========================================================
-
-  function processSelectedFile(file) {
-
-    console.log("📷 Traitement :", file.name);
-
-    // --------------------------------------------------------
-    // TYPE
-    // --------------------------------------------------------
-
-    const allowedTypes = [
+    const allowedMimeTypes = [
       "image/jpeg",
       "image/png",
       "image/webp"
     ];
 
-    if (!allowedTypes.includes(file.type)) {
+    const safeMimeType = allowedMimeTypes.includes(mimeType)
+      ? mimeType
+      : "image/jpeg";
 
-      showError(
-        "Format non accepté. Utilisez JPG, PNG ou WebP."
-      );
-
-      resetFile();
-
-      return;
-    }
-
-    // --------------------------------------------------------
-    // TAILLE
-    // --------------------------------------------------------
-
-    const maxSize = 10 * 1024 * 1024;
-
-    if (file.size > maxSize) {
-
-      showError(
-        "Image trop lourde. Taille maximale : 10 MB."
-      );
-
-      resetFile();
-
-      return;
-    }
-
-    // --------------------------------------------------------
-    // STOCKAGE
-    // --------------------------------------------------------
-
-    selectedFile = file;
-
-    // --------------------------------------------------------
-    // LECTURE
-    // --------------------------------------------------------
-
-    const reader = new FileReader();
-
-    reader.onload = (event) => {
-
-      selectedBase64 =
-        event.target.result.split(",")[1];
-
-      console.log("✅ Image convertie en Base64");
-
-      showPreview(
-        event.target.result,
-        file
-      );
-
-      // Active le bouton
-      if (scanBtn) {
-        scanBtn.disabled = false;
-        scanBtn.innerText = "🧠 Lancer l'analyse SMC";
-      }
-
-      // Message utilisateur
-      if (outputContainer) {
-
-        outputContainer.innerHTML = `
-          <div style="
-            padding:20px;
-            text-align:center;
-            color:#cbd5e1;
-            background:rgba(15,23,42,.65);
-            border-radius:10px;
-          ">
-            <div style="
-              font-size:28px;
-              margin-bottom:8px;
-            ">
-              ✅
-            </div>
-
-            <strong style="color:#4ed9a2;">
-              Image prête
-            </strong>
-
-            <p style="
-              margin-top:6px;
-              font-size:13px;
-              color:#94a3b8;
-            ">
-              Cliquez sur « Lancer l'analyse SMC »
-            </p>
-          </div>
-        `;
-      }
-    };
-
-    reader.onerror = () => {
-
-      console.error(
-        "❌ Impossible de lire l'image"
-      );
-
-      showError(
-        "Impossible de lire cette image."
-      );
-    };
-
-    reader.readAsDataURL(file);
-  }
-
-  // ==========================================================
-  // APERÇU
-  // ==========================================================
-
-  function showPreview(dataUrl, file) {
-
-    if (!dropZone) {
-      return;
-    }
-
-    // IMPORTANT :
-    // On ne remplace PAS tout le innerHTML de la zone.
-    // Cela évite de supprimer l'input file.
-
-    let preview =
-      dropZone.querySelector(".arkas-image-preview");
-
-    if (!preview) {
-
-      preview =
-        document.createElement("div");
-
-      preview.className =
-        "arkas-image-preview";
-
-      preview.style.cssText = `
-        margin-top:12px;
-        text-align:center;
-      `;
-
-      dropZone.appendChild(preview);
-    }
-
-    preview.innerHTML = `
-
-      <img
-        src="${dataUrl}"
-        alt="Graphique sélectionné"
-        style="
-          display:block;
-          max-width:100%;
-          width:auto;
-          max-height:220px;
-          margin:0 auto;
-          border-radius:10px;
-          object-fit:contain;
-          box-shadow:0 0 20px rgba(0,0,0,.35);
-        "
-      >
-
-      <div style="
-        margin-top:8px;
-        color:#4ed9a2;
-        font-size:13px;
-        font-weight:600;
-      ">
-        ✓ Image prête pour l'analyse
-      </div>
-
-      <div style="
-        margin-top:4px;
-        color:#94a3b8;
-        font-size:11px;
-      ">
-        ${escapeHtml(file.name)}
-      </div>
-
-      <button
-        type="button"
-        class="arkas-change-image"
-        style="
-          margin-top:10px;
-          padding:7px 12px;
-          border:1px solid #334155;
-          border-radius:6px;
-          background:#1e293b;
-          color:#cbd5e1;
-          cursor:pointer;
-        "
-      >
-        📷 Changer l'image
-      </button>
-    `;
-
-    const changeBtn =
-      preview.querySelector(".arkas-change-image");
-
-    if (changeBtn) {
-
-      changeBtn.addEventListener("click", (event) => {
-
-        event.stopPropagation();
-
-        fileInput.click();
+    // Limite approximative pour éviter des requêtes énormes
+    if (imageBase64.length > 12 * 1024 * 1024) {
+      return res.status(413).json({
+        success: false,
+        error: "Image trop volumineuse. Utilisez une image plus légère."
       });
     }
-  }
 
-  // ==========================================================
-  // BOUTON SCAN
-  // ==========================================================
+    // ----------------------------------------------------------
+    // PROMPT ARKAS SCAN AI
+    // ----------------------------------------------------------
+    const systemPrompt = `
+Tu es ARKAS SCAN AI V2, un analyseur de graphiques spécialisé
+dans Smart Money Concepts (SMC) et Price Action.
 
-  if (scanBtn) {
+Analyse UNIQUEMENT ce qui est réellement visible sur le graphique.
 
-    scanBtn.disabled = false;
+NE FORCE JAMAIS un signal.
 
-    scanBtn.addEventListener("click", async (event) => {
+Si les preuves sont insuffisantes, retourne WAIT.
 
-      event.preventDefault();
-      event.stopPropagation();
+Tu dois rechercher :
 
-      console.log("🧠 Démarrage du scan");
+1. Tendance générale
+2. Structure du marché
+3. BOS (Break of Structure)
+4. CHoCH (Change of Character)
+5. Liquidité
+6. Liquidity Sweep
+7. Order Block
+8. Fair Value Gap
+9. Premium / Discount
+10. Price Action
+11. Zone d'achat
+12. Zone de vente
+13. Confirmation du mouvement
+14. Entry
+15. Stop Loss
+16. Take Profit 1
+17. Take Profit 2
 
-      // ------------------------------------------------------
-      // VÉRIFICATION
-      // ------------------------------------------------------
+RÈGLES :
 
-      if (!selectedFile || !selectedBase64) {
+- BUY uniquement si la structure et la confirmation favorisent réellement
+  une hausse.
+- SELL uniquement si la structure et la confirmation favorisent réellement
+  une baisse.
+- Sinon WAIT.
+- Ne jamais inventer un prix qui n'est pas cohérent avec le graphique.
+- Le Stop Loss doit être placé derrière une zone technique logique.
+- TP1 et TP2 doivent être cohérents avec la structure/liquidité.
+- Le Risk/Reward doit être calculé correctement.
+- Si les niveaux Entry/SL/TP ne sont pas suffisamment fiables,
+  trade_valid doit être false.
+- Le score ARKAS est compris entre 0 et 100.
 
-        showError(
-          "Veuillez sélectionner une image du graphique avant de lancer l'analyse."
-        );
+Répartition du score :
 
-        return;
-      }
+Structure = 25 points
+Liquidité = 20 points
+Order Block = 15 points
+FVG = 15 points
+Price Action = 15 points
+Risk/Reward = 10 points
 
-      // ------------------------------------------------------
-      // LOADER
-      // ------------------------------------------------------
+Interprétation :
 
-      setLoading(true);
+80-100 = configuration forte
+65-79 = configuration intéressante
+50-64 = attendre une confirmation
+0-49 = aucune configuration suffisamment fiable
 
-      try {
+${prompt}
 
-        // ----------------------------------------------------
-        // REQUÊTE VERCEL
-        // ----------------------------------------------------
+IMPORTANT :
+Réponds UNIQUEMENT avec un objet JSON valide.
+Aucun texte avant ou après le JSON.
 
-        console.log(
-          "📡 Envoi vers :",
-          PROXY_API_URL
-        );
+FORMAT EXACT :
 
-        const response = await fetch(
-          PROXY_API_URL,
+{
+  "asset": "nom du marché si visible",
+  "timeframe": "timeframe si visible",
+  "direction": "BUY|SELL|WAIT",
+  "signal": "BUY|SELL|WAIT",
+  "market_bias": "BULLISH|BEARISH|NEUTRAL",
+
+  "trade_valid": true,
+
+  "entry": null,
+  "sl": null,
+  "tp1": null,
+  "tp2": null,
+  "rr": null,
+
+  "arkas_score": 0,
+
+  "structure": {
+    "bos": "",
+    "choch": "",
+    "description": ""
+  },
+
+  "liquidity": {
+    "type": "",
+    "description": ""
+  },
+
+  "order_block": {
+    "detected": false,
+    "type": "",
+    "zone": "",
+    "description": ""
+  },
+
+  "fvg": {
+    "detected": false,
+    "type": "",
+    "zone": "",
+    "description": ""
+  },
+
+  "price_action": {
+    "confirmation": "",
+    "description": ""
+  },
+
+  "score_breakdown": {
+    "structure": 0,
+    "liquidity": 0,
+    "order_block": 0,
+    "fvg": 0,
+    "price_action": 0,
+    "risk_reward": 0
+  },
+
+  "reason": "",
+  "risk_warning": ""
+}
+`;
+
+    // ----------------------------------------------------------
+    // APPEL GEMINI
+    // ----------------------------------------------------------
+    const geminiUrl =
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" +
+      encodeURIComponent(apiKey);
+
+    const geminiResponse = await fetch(geminiUrl, {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json"
+      },
+
+      body: JSON.stringify({
+
+        contents: [
           {
-            method: "POST",
-
-            headers: {
-              "Content-Type": "application/json"
-            },
-
-            body: JSON.stringify({
-
-              imageBase64: selectedBase64,
-
-              mimeType:
-                selectedFile.type ||
-                "image/jpeg",
-
-              prompt: `
-Analyse ce graphique avec ARKAS SCAN AI V2.
-
-Utilise Smart Money Concepts et Price Action.
-
-Identifie :
-- tendance
-- structure
-- BOS
-- CHoCH
-- liquidité
-- liquidity sweep
-- Order Block
-- Fair Value Gap
-- premium / discount
-- confirmation Price Action
-- zone d'achat
-- zone de vente
-
-Si une configuration valide existe :
-donne Entry, SL, TP1 et TP2.
-
-Si les conditions ne sont pas suffisamment confirmées :
-retourne WAIT.
-
-Ne force jamais un BUY ou SELL.
-              `
-            })
+            parts: [
+              {
+                text: systemPrompt
+              },
+              {
+                inline_data: {
+                  mime_type: safeMimeType,
+                  data: imageBase64
+                }
+              }
+            ]
           }
-        );
+        ],
 
-        console.log(
-          "📥 Réponse serveur :",
-          response.status
-        );
-
-        // ----------------------------------------------------
-        // LECTURE RÉPONSE
-        // ----------------------------------------------------
-
-        const data =
-          await response.json();
-
-        console.log(
-          "📊 Réponse API :",
-          data
-        );
-
-        // ----------------------------------------------------
-        // ERREUR API
-        // ----------------------------------------------------
-
-        if (!response.ok) {
-
-          throw new Error(
-            data?.error ||
-            `Erreur serveur (${response.status})`
-          );
+        generationConfig: {
+          temperature: 0.15,
+          responseMimeType: "application/json"
         }
 
-        // ----------------------------------------------------
-        // NOUVELLE STRUCTURE ARKAS V2
-        // ----------------------------------------------------
-
-        if (
-          !data ||
-          !data.analysis
-        ) {
-
-          console.error(
-            "Réponse inattendue :",
-            data
-          );
-
-          throw new Error(
-            "L'API n'a pas retourné d'analyse."
-          );
-        }
-
-        // ----------------------------------------------------
-        // AFFICHAGE
-        // ----------------------------------------------------
-
-        displayAnalysis(
-          data.analysis
-        );
-
-      } catch (error) {
-
-        console.error(
-          "❌ Erreur de scan :",
-          error
-        );
-
-        showError(
-          error.message ||
-          "Une erreur est survenue pendant l'analyse."
-        );
-
-      } finally {
-
-        setLoading(false);
-      }
+      })
     });
-  }
 
-  // ==========================================================
-  // LOADER
-  // ==========================================================
+    const geminiData = await geminiResponse.json();
 
-  function setLoading(loading) {
+    // ----------------------------------------------------------
+    // ERREUR GEMINI
+    // ----------------------------------------------------------
+    if (!geminiResponse.ok) {
 
-    if (!scanBtn) {
-      return;
-    }
-
-    scanBtn.disabled = loading;
-
-    scanBtn.innerText =
-      loading
-        ? "🧠 Analyse SMC en cours..."
-        : "🧠 Lancer l'analyse SMC";
-  }
-
-  // ==========================================================
-  // AFFICHAGE ANALYSE
-  // ==========================================================
-
-  function displayAnalysis(data) {
-
-    if (!outputContainer) {
-      return;
-    }
-
-    const direction =
-      String(data.direction || "WAIT")
-        .toUpperCase();
-
-    const signal =
-      String(data.signal || "WAIT")
-        .toUpperCase();
-
-    const score =
-      Number(data.arkas_score || 0);
-
-    const isBuy =
-      direction === "BUY";
-
-    const isSell =
-      direction === "SELL";
-
-    const isWait =
-      direction === "WAIT";
-
-    let signalColor = "#facc15";
-
-    if (isBuy) {
-      signalColor = "#22c55e";
-    }
-
-    if (isSell) {
-      signalColor = "#ef4444";
-    }
-
-    // --------------------------------------------------------
-    // HTML
-    // --------------------------------------------------------
-
-    outputContainer.innerHTML = `
-
-      <div style="
-        background:#0f172a;
-        border:1px solid #1e293b;
-        border-radius:12px;
-        padding:16px;
-        color:#e2e8f0;
-      ">
-
-        <!-- HEADER -->
-
-        <div style="
-          display:flex;
-          justify-content:space-between;
-          align-items:center;
-          gap:10px;
-          flex-wrap:wrap;
-          border-bottom:1px solid #1e293b;
-          padding-bottom:14px;
-          margin-bottom:14px;
-        ">
-
-          <div>
-
-            <div style="
-              color:#94a3b8;
-              font-size:12px;
-            ">
-              ARKAS SCAN AI V2
-            </div>
-
-            <h3 style="
-              margin:4px 0 0;
-              color:${signalColor};
-              font-size:20px;
-            ">
-              ${escapeHtml(
-                data.asset || "Marché"
-              )}
-              —
-              ${escapeHtml(signal)}
-            </h3>
-
-          </div>
-
-          <div style="
-            background:rgba(78,217,162,.10);
-            border:1px solid #4ed9a2;
-            border-radius:10px;
-            padding:10px 14px;
-            text-align:center;
-          ">
-
-            <div style="
-              font-size:11px;
-              color:#94a3b8;
-            ">
-              SCORE ARKAS
-            </div>
-
-            <strong style="
-              color:#4ed9a2;
-              font-size:24px;
-            ">
-              ${score}/100
-            </strong>
-
-          </div>
-
-        </div>
-
-
-        <!-- BIAS -->
-
-        <div style="
-          display:grid;
-          grid-template-columns:repeat(2,minmax(0,1fr));
-          gap:8px;
-          margin-bottom:14px;
-        ">
-
-          ${infoCard(
-            "BIAIS",
-            data.market_bias || "NEUTRAL"
-          )}
-
-          ${infoCard(
-            "TIMEFRAME",
-            data.timeframe || "N/A"
-          )}
-
-        </div>
-
-
-        <!-- TRADE -->
-
-        ${
-          data.trade_valid
-            ? `
-              <div style="
-                display:grid;
-                grid-template-columns:repeat(2,minmax(0,1fr));
-                gap:8px;
-                margin-bottom:14px;
-              ">
-
-                ${priceCard(
-                  "ENTRY",
-                  data.entry,
-                  "#3b82f6"
-                )}
-
-                ${priceCard(
-                  "STOP LOSS",
-                  data.sl,
-                  "#ef4444"
-                )}
-
-                ${priceCard(
-                  "TAKE PROFIT 1",
-                  data.tp1,
-                  "#22c55e"
-                )}
-
-                ${priceCard(
-                  "TAKE PROFIT 2",
-                  data.tp2,
-                  "#10b981"
-                )}
-
-              </div>
-
-              <div style="
-                background:#1e293b;
-                padding:12px;
-                border-radius:8px;
-                margin-bottom:14px;
-                text-align:center;
-              ">
-
-                <span style="
-                  color:#94a3b8;
-                  font-size:12px;
-                ">
-                  RISK / REWARD
-                </span>
-
-                <strong style="
-                  color:#4ed9a2;
-                  font-size:18px;
-                  margin-left:8px;
-                ">
-                  1:${data.rr ?? "N/A"}
-                </strong>
-
-              </div>
-            `
-            : `
-              <div style="
-                padding:15px;
-                border-radius:9px;
-                background:rgba(250,204,21,.08);
-                border:1px solid rgba(250,204,21,.35);
-                color:#fde68a;
-                margin-bottom:14px;
-              ">
-                ⚠️
-                <strong>
-                  PAS DE TRADE POUR LE MOMENT
-                </strong>
-
-                <div style="
-                  margin-top:6px;
-                  font-size:12px;
-                ">
-                  ${escapeHtml(
-                    data.reason ||
-                    "La configuration n'est pas suffisamment confirmée."
-                  )}
-                </div>
-              </div>
-            `
-        }
-
-
-        <!-- STRUCTURE -->
-
-        <section style="
-          background:#111827;
-          border-radius:9px;
-          padding:12px;
-          margin-bottom:10px;
-        ">
-
-          <h4 style="
-            color:#4ed9a2;
-            margin:0 0 9px;
-            font-size:14px;
-          ">
-            📊 Structure du marché
-          </h4>
-
-          <div style="font-size:13px;line-height:1.6;">
-
-            <div>
-              <strong>BOS :</strong>
-              ${escapeHtml(
-                data.structure?.bos || "Non identifié"
-              )}
-            </div>
-
-            <div>
-              <strong>CHoCH :</strong>
-              ${escapeHtml(
-                data.structure?.choch || "Non identifié"
-              )}
-            </div>
-
-            <div>
-              <strong>Analyse :</strong>
-              ${escapeHtml(
-                data.structure?.description || "N/A"
-              )}
-            </div>
-
-          </div>
-
-        </section>
-
-
-        <!-- LIQUIDITY -->
-
-        <section style="
-          background:#111827;
-          border-radius:9px;
-          padding:12px;
-          margin-bottom:10px;
-        ">
-
-          <h4 style="
-            color:#facc15;
-            margin:0 0 9px;
-            font-size:14px;
-          ">
-            💧 Liquidité
-          </h4>
-
-          <div style="
-            font-size:13px;
-            line-height:1.6;
-          ">
-
-            <div>
-              <strong>Type :</strong>
-              ${escapeHtml(
-                data.liquidity?.type ||
-                "Non identifié"
-              )}
-            </div>
-
-            <div>
-              ${escapeHtml(
-                data.liquidity?.description ||
-                "Aucune information."
-              )}
-            </div>
-
-          </div>
-
-        </section>
-
-
-        <!-- ORDER BLOCK -->
-
-        <section style="
-          background:#111827;
-          border-radius:9px;
-          padding:12px;
-          margin-bottom:10px;
-        ">
-
-          <h4 style="
-            color:#60a5fa;
-            margin:0 0 9px;
-            font-size:14px;
-          ">
-            🟦 Order Block
-          </h4>
-
-          <div style="
-            font-size:13px;
-            line-height:1.6;
-          ">
-
-            <div>
-              <strong>Détecté :</strong>
-              ${
-                data.order_block?.detected
-                  ? "✅ Oui"
-                  : "❌ Non"
-              }
-            </div>
-
-            <div>
-              <strong>Type :</strong>
-              ${escapeHtml(
-                data.order_block?.type ||
-                "N/A"
-              )}
-            </div>
-
-            <div>
-              <strong>Zone :</strong>
-              ${escapeHtml(
-                data.order_block?.zone ||
-                "N/A"
-              )}
-            </div>
-
-            <div>
-              ${escapeHtml(
-                data.order_block?.description ||
-                ""
-              )}
-            </div>
-
-          </div>
-
-        </section>
-
-
-        <!-- FVG -->
-
-        <section style="
-          background:#111827;
-          border-radius:9px;
-          padding:12px;
-          margin-bottom:10px;
-        ">
-
-          <h4 style="
-            color:#f59e0b;
-            margin:0 0 9px;
-            font-size:14px;
-          ">
-            🟨 Fair Value Gap
-          </h4>
-
-          <div style="
-            font-size:13px;
-            line-height:1.6;
-          ">
-
-            <div>
-              <strong>Détecté :</strong>
-              ${
-                data.fvg?.detected
-                  ? "✅ Oui"
-                  : "❌ Non"
-              }
-            </div>
-
-            <div>
-              <strong>Type :</strong>
-              ${escapeHtml(
-                data.fvg?.type ||
-                "N/A"
-              )}
-            </div>
-
-            <div>
-              <strong>Zone :</strong>
-              ${escapeHtml(
-                data.fvg?.zone ||
-                "N/A"
-              )}
-            </div>
-
-            <div>
-              ${escapeHtml(
-                data.fvg?.description ||
-                ""
-              )}
-            </div>
-
-          </div>
-
-        </section>
-
-
-        <!-- PRICE ACTION -->
-
-        <section style="
-          background:#111827;
-          border-radius:9px;
-          padding:12px;
-          margin-bottom:10px;
-        ">
-
-          <h4 style="
-            color:#c084fc;
-            margin:0 0 9px;
-            font-size:14px;
-          ">
-            🕯️ Price Action
-          </h4>
-
-          <div style="
-            font-size:13px;
-            line-height:1.6;
-          ">
-
-            <div>
-              <strong>Confirmation :</strong>
-              ${escapeHtml(
-                data.price_action?.confirmation ||
-                "N/A"
-              )}
-            </div>
-
-            <div>
-              ${escapeHtml(
-                data.price_action?.description ||
-                ""
-              )}
-            </div>
-
-          </div>
-
-        </section>
-
-
-        <!-- SCORE -->
-
-        <section style="
-          background:#111827;
-          border-radius:9px;
-          padding:12px;
-          margin-bottom:10px;
-        ">
-
-          <h4 style="
-            color:#4ed9a2;
-            margin:0 0 10px;
-            font-size:14px;
-          ">
-            🎯 Détail du Score ARKAS
-          </h4>
-
-          ${scoreRow(
-            "Structure",
-            data.score_breakdown?.structure,
-            25
-          )}
-
-          ${scoreRow(
-            "Liquidité",
-            data.score_breakdown?.liquidity,
-            20
-          )}
-
-          ${scoreRow(
-            "Order Block",
-            data.score_breakdown?.order_block,
-            15
-          )}
-
-          ${scoreRow(
-            "FVG",
-            data.score_breakdown?.fvg,
-            15
-          )}
-
-          ${scoreRow(
-            "Price Action",
-            data.score_breakdown?.price_action,
-            15
-          )}
-
-          ${scoreRow(
-            "Risk / Reward",
-            data.score_breakdown?.risk_reward,
-            10
-          )}
-
-        </section>
-
-
-        <!-- CONCLUSION -->
-
-        <div style="
-          padding:13px;
-          border-radius:9px;
-          background:rgba(78,217,162,.07);
-          border-left:3px solid #4ed9a2;
-          font-size:13px;
-          line-height:1.6;
-        ">
-
-          <strong style="color:#4ed9a2;">
-            🧠 Conclusion ARKAS
-          </strong>
-
-          <div style="margin-top:6px;">
-            ${escapeHtml(
-              data.reason ||
-              "Analyse terminée."
-            )}
-          </div>
-
-        </div>
-
-
-        <!-- WARNING -->
-
-        ${
-          data.risk_warning
-            ? `
-              <div style="
-                margin-top:10px;
-                font-size:11px;
-                color:#94a3b8;
-                text-align:center;
-              ">
-                ⚠️
-                ${escapeHtml(
-                  data.risk_warning
-                )}
-              </div>
-            `
-            : ""
-        }
-
-      </div>
-    `;
-  }
-
-  // ==========================================================
-  // CARTES
-  // ==========================================================
-
-  function priceCard(label, value, color) {
-
-    return `
-      <div style="
-        background:#1e293b;
-        padding:12px;
-        border-radius:8px;
-        border-left:4px solid ${color};
-      ">
-
-        <div style="
-          color:#94a3b8;
-          font-size:10px;
-          margin-bottom:5px;
-        ">
-          ${label}
-        </div>
-
-        <strong style="
-          color:#fff;
-          font-size:16px;
-        ">
-          ${
-            value !== null &&
-            value !== undefined
-              ? escapeHtml(String(value))
-              : "N/A"
-          }
-        </strong>
-
-      </div>
-    `;
-  }
-
-  function infoCard(label, value) {
-
-    return `
-      <div style="
-        background:#1e293b;
-        padding:10px;
-        border-radius:8px;
-      ">
-
-        <div style="
-          color:#64748b;
-          font-size:10px;
-        ">
-          ${label}
-        </div>
-
-        <strong style="
-          color:#e2e8f0;
-          font-size:13px;
-        ">
-          ${escapeHtml(String(value))}
-        </strong>
-
-      </div>
-    `;
-  }
-
-  function scoreRow(label, value, max) {
-
-    const score =
-      Number(value || 0);
-
-    const percent =
-      Math.max(
-        0,
-        Math.min(
-          100,
-          (score / max) * 100
-        )
+      console.error(
+        "Erreur Gemini :",
+        JSON.stringify(geminiData)
       );
 
-    return `
-      <div style="
-        margin-bottom:9px;
-      ">
+      const message =
+        geminiData?.error?.message ||
+        "Erreur lors de l'appel à Gemini.";
 
-        <div style="
-          display:flex;
-          justify-content:space-between;
-          font-size:11px;
-          margin-bottom:4px;
-        ">
-
-          <span>
-            ${label}
-          </span>
-
-          <strong>
-            ${score}/${max}
-          </strong>
-
-        </div>
-
-        <div style="
-          height:5px;
-          background:#1e293b;
-          border-radius:10px;
-          overflow:hidden;
-        ">
-
-          <div style="
-            width:${percent}%;
-            height:100%;
-            background:#4ed9a2;
-            border-radius:10px;
-          "></div>
-
-        </div>
-
-      </div>
-    `;
-  }
-
-  // ==========================================================
-  // ERREUR
-  // ==========================================================
-
-  function showError(message) {
-
-    console.error(
-      "⚠️ ARKAS ERROR:",
-      message
-    );
-
-    if (!outputContainer) {
-      alert(message);
-      return;
+      return res.status(geminiResponse.status).json({
+        success: false,
+        error: message
+      });
     }
 
-    outputContainer.innerHTML = `
+    // ----------------------------------------------------------
+    // EXTRACTION TEXTE
+    // ----------------------------------------------------------
+    const rawText =
+      geminiData?.candidates?.[0]?.content?.parts
+        ?.map(part => part.text || "")
+        .join("")
+        .trim();
 
-      <div style="
-        padding:16px;
-        border-radius:10px;
-        background:rgba(239,68,68,.10);
-        border:1px solid rgba(239,68,68,.35);
-        color:#fecaca;
-      ">
+    if (!rawText) {
+      return res.status(502).json({
+        success: false,
+        error: "Gemini n'a retourné aucune analyse."
+      });
+    }
 
-        <strong style="
-          color:#ef4444;
-        ">
-          ⚠️ Erreur ARKAS SCAN AI
-        </strong>
+    // ----------------------------------------------------------
+    // NETTOYAGE JSON
+    // ----------------------------------------------------------
+    let cleanJson = rawText;
 
-        <div style="
-          margin-top:8px;
-          font-size:13px;
-          line-height:1.5;
-          word-break:break-word;
-        ">
-          ${escapeHtml(message)}
-        </div>
+    // Supprime éventuellement ```json ... ```
+    cleanJson = cleanJson
+      .replace(/^```json\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/\s*```$/i, "")
+      .trim();
 
-      </div>
-    `;
-  }
-
-  // ==========================================================
-  // RESET
-  // ==========================================================
-
-  function resetFile() {
-
-    selectedFile = null;
-    selectedBase64 = null;
+    let analysis;
 
     try {
-      fileInput.value = "";
-    } catch (error) {
-      console.warn(error);
+
+      analysis = JSON.parse(cleanJson);
+
+    } catch (parseError) {
+
+      console.error(
+        "JSON Gemini invalide :",
+        rawText
+      );
+
+      return res.status(502).json({
+        success: false,
+        error: "Gemini a retourné une réponse JSON invalide."
+      });
     }
+
+    // ----------------------------------------------------------
+    // VALEURS PAR DÉFAUT
+    // ----------------------------------------------------------
+    analysis.asset =
+      analysis.asset || "Marché";
+
+    analysis.timeframe =
+      analysis.timeframe || "N/A";
+
+    analysis.direction =
+      String(analysis.direction || "WAIT").toUpperCase();
+
+    analysis.signal =
+      String(analysis.signal || analysis.direction || "WAIT").toUpperCase();
+
+    analysis.market_bias =
+      String(analysis.market_bias || "NEUTRAL").toUpperCase();
+
+    analysis.structure =
+      analysis.structure || {};
+
+    analysis.liquidity =
+      analysis.liquidity || {};
+
+    analysis.order_block =
+      analysis.order_block || {};
+
+    analysis.fvg =
+      analysis.fvg || {};
+
+    analysis.price_action =
+      analysis.price_action || {};
+
+    analysis.score_breakdown =
+      analysis.score_breakdown || {};
+
+    // ----------------------------------------------------------
+    // NORMALISATION DU SIGNAL
+    // ----------------------------------------------------------
+    if (
+      !["BUY", "SELL", "WAIT"].includes(analysis.direction)
+    ) {
+      analysis.direction = "WAIT";
+    }
+
+    if (
+      !["BUY", "SELL", "WAIT"].includes(analysis.signal)
+    ) {
+      analysis.signal = analysis.direction;
+    }
+
+    // ----------------------------------------------------------
+    // SCORE ARKAS
+    // ----------------------------------------------------------
+    const structureScore = clampScore(
+      analysis.score_breakdown.structure,
+      25
+    );
+
+    const liquidityScore = clampScore(
+      analysis.score_breakdown.liquidity,
+      20
+    );
+
+    const orderBlockScore = clampScore(
+      analysis.score_breakdown.order_block,
+      15
+    );
+
+    const fvgScore = clampScore(
+      analysis.score_breakdown.fvg,
+      15
+    );
+
+    const priceActionScore = clampScore(
+      analysis.score_breakdown.price_action,
+      15
+    );
+
+    // RR sera recalculé plus bas
+    let rrScore = 0;
+
+    // ----------------------------------------------------------
+    // PRIX
+    // ----------------------------------------------------------
+    const entry = toNumber(analysis.entry);
+    const sl = toNumber(analysis.sl);
+    const tp1 = toNumber(analysis.tp1);
+    const tp2 = toNumber(analysis.tp2);
+
+    analysis.entry = entry;
+    analysis.sl = sl;
+    analysis.tp1 = tp1;
+    analysis.tp2 = tp2;
+
+    // ----------------------------------------------------------
+    // VALIDATION DU TRADE
+    // ----------------------------------------------------------
+    let validTrade = true;
+
+    if (
+      analysis.direction === "WAIT" ||
+      analysis.signal === "WAIT"
+    ) {
+      validTrade = false;
+    }
+
+    if (
+      entry === null ||
+      sl === null ||
+      tp1 === null ||
+      tp2 === null
+    ) {
+      validTrade = false;
+    }
+
+    // ----------------------------------------------------------
+    // VALIDATION BUY
+    // BUY : SL < Entry < TP1 < TP2
+    // ----------------------------------------------------------
+    if (analysis.direction === "BUY") {
+
+      if (
+        !(
+          sl < entry &&
+          entry < tp1 &&
+          tp1 < tp2
+        )
+      ) {
+        validTrade = false;
+      }
+
+    }
+
+    // ----------------------------------------------------------
+    // VALIDATION SELL
+    // SELL : TP2 < TP1 < Entry < SL
+    // ----------------------------------------------------------
+    if (analysis.direction === "SELL") {
+
+      if (
+        !(
+          tp2 < tp1 &&
+          tp1 < entry &&
+          entry < sl
+        )
+      ) {
+        validTrade = false;
+      }
+
+    }
+
+    // ----------------------------------------------------------
+    // CALCUL RISK / REWARD
+    // ----------------------------------------------------------
+    let rr = null;
+
+    if (
+      validTrade &&
+      entry !== null &&
+      sl !== null &&
+      tp2 !== null
+    ) {
+
+      const risk =
+        Math.abs(entry - sl);
+
+      const reward =
+        Math.abs(tp2 - entry);
+
+      if (risk > 0) {
+        rr = reward / risk;
+      }
+    }
+
+    analysis.rr =
+      rr !== null
+        ? Number(rr.toFixed(2))
+        : null;
+
+    // ----------------------------------------------------------
+    // SCORE RR
+    // ----------------------------------------------------------
+    if (rr !== null) {
+
+      if (rr >= 3) {
+        rrScore = 10;
+      } else if (rr >= 2) {
+        rrScore = 8;
+      } else if (rr >= 1.5) {
+        rrScore = 6;
+      } else if (rr >= 1) {
+        rrScore = 3;
+      } else {
+        rrScore = 0;
+      }
+    }
+
+    // ----------------------------------------------------------
+    // SCORE FINAL
+    // ----------------------------------------------------------
+    const finalScore =
+      structureScore +
+      liquidityScore +
+      orderBlockScore +
+      fvgScore +
+      priceActionScore +
+      rrScore;
+
+    analysis.score_breakdown = {
+      structure: structureScore,
+      liquidity: liquidityScore,
+      order_block: orderBlockScore,
+      fvg: fvgScore,
+      price_action: priceActionScore,
+      risk_reward: rrScore
+    };
+
+    analysis.arkas_score = Math.round(
+      Math.max(0, Math.min(100, finalScore))
+    );
+
+    // ----------------------------------------------------------
+    // SI LE TRADE EST INVALIDE -> WAIT
+    // ----------------------------------------------------------
+    if (!validTrade) {
+
+      analysis.trade_valid = false;
+      analysis.direction = "WAIT";
+      analysis.signal = "WAIT";
+      analysis.entry = null;
+      analysis.sl = null;
+      analysis.tp1 = null;
+      analysis.tp2 = null;
+      analysis.rr = null;
+
+      if (!analysis.reason) {
+        analysis.reason =
+          "Les conditions techniques ne sont pas suffisamment confirmées pour prendre un trade.";
+      }
+
+    } else {
+
+      analysis.trade_valid = true;
+
+    }
+
+    // ----------------------------------------------------------
+    // SEUIL DE SÉCURITÉ DU SCORE
+    // ----------------------------------------------------------
+    if (
+      analysis.arkas_score < 50
+    ) {
+
+      analysis.trade_valid = false;
+      analysis.direction = "WAIT";
+      analysis.signal = "WAIT";
+
+      analysis.entry = null;
+      analysis.sl = null;
+      analysis.tp1 = null;
+      analysis.tp2 = null;
+      analysis.rr = null;
+
+      analysis.reason =
+        "Score ARKAS insuffisant. Attendre une meilleure confirmation.";
+
+    }
+
+    // ----------------------------------------------------------
+    // AVERTISSEMENT
+    // ----------------------------------------------------------
+    if (!analysis.risk_warning) {
+
+      analysis.risk_warning =
+        "Cette analyse est une aide technique et ne garantit pas un résultat financier.";
+    }
+
+    // ----------------------------------------------------------
+    // RÉPONSE FINALE
+    // ----------------------------------------------------------
+    return res.status(200).json({
+
+      success: true,
+
+      engine: "ARKAS SCAN AI V2",
+
+      model: "gemini-2.5-flash",
+
+      analysis
+
+    });
+
+  } catch (error) {
+
+    console.error(
+      "Erreur serveur ARKAS :",
+      error
+    );
+
+    return res.status(500).json({
+
+      success: false,
+
+      error:
+        error?.message ||
+        "Erreur interne du serveur."
+
+    });
+  }
+}
+
+
+// ============================================================
+// OUTILS
+// ============================================================
+
+function toNumber(value) {
+
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return null;
   }
 
-  // ==========================================================
-  // PROTECTION HTML
-  // ==========================================================
+  const number =
+    Number(
+      String(value)
+        .replace(",", ".")
+        .trim()
+    );
 
-  function escapeHtml(value) {
+  return Number.isFinite(number)
+    ? number
+    : null;
+}
 
-    return String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
+
+function clampScore(value, max) {
+
+  const number =
+    Number(value);
+
+  if (!Number.isFinite(number)) {
+    return 0;
   }
 
-  // ==========================================================
-  // FIN
-  // ==========================================================
-
-  console.log(
-    "✅ ARKAS SCAN AI V2 prêt."
+  return Math.round(
+    Math.max(0, Math.min(max, number))
   );
-
-});
+}

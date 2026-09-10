@@ -1,392 +1,488 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>ARKAS SCAN AI V2</title>
+    <title>ARKAS SCAN AI V2</title>
 
-  <meta
-    name="description"
-    content="ARKAS SCAN AI V2 - Analyse de graphiques avec Price Action et Smart Money Concepts."
-  >
+    <meta
+        name="description"
+        content="ARKAS SCAN AI V2 — Analyse de graphiques avec Smart Money Concepts et Price Action."
+    >
 
-  <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 
 <body class="dashboard-body">
 
-  <!-- =========================================================
-       ARRIÈRE-PLAN
-  ========================================================== -->
-  <div class="bg-overlay"></div>
+    <!-- =====================================================
+         ARRIÈRE-PLAN
+    ====================================================== -->
+
+    <div class="bg-overlay"></div>
 
 
-  <!-- =========================================================
-       NAVIGATION
-  ========================================================== -->
-  <header class="navbar">
+    <!-- =====================================================
+         NAVBAR
+    ====================================================== -->
 
-    <div class="logo">
-      <h2>ARKAS SCAN AI</h2>
-      <span>V2</span>
-    </div>
+    <header class="navbar">
 
-    <div class="user-menu">
+        <div class="logo">
 
-      <span id="user-status" class="header-status">
-        Prêt
-      </span>
+            <h2>ARKAS SCAN AI</h2>
 
-      <span id="user-email">
-        Chargement...
-      </span>
-
-      <button
-        id="logout-btn"
-        class="btn-secondary"
-        type="button"
-      >
-        Déconnexion
-      </button>
-
-    </div>
-
-  </header>
-
-
-  <!-- =========================================================
-       CONTENU PRINCIPAL
-  ========================================================== -->
-  <main class="dashboard-container">
-
-
-    <!-- =======================================================
-         SECTION SCANNER
-    ======================================================== -->
-    <section class="card upload-section">
-
-      <div class="section-header">
-
-        <div>
-          <h3>Scanner un graphique</h3>
-
-          <p>
-            Importez une capture d'écran de votre graphique.
-            ARKAS SCAN AI analyse la structure du marché,
-            la liquidité, les Order Blocks, les FVG,
-            le BOS, le CHoCH et le Price Action.
-          </p>
-        </div>
-
-        <div class="engine-badge">
-          ARKAS AI
-        </div>
-
-      </div>
-
-
-      <!-- =====================================================
-           ZONE DE DÉPÔT
-      ====================================================== -->
-      <div
-        class="drop-zone"
-        id="dropZone"
-        role="button"
-        tabindex="0"
-        aria-label="Importer un graphique"
-      >
-
-        <input
-          type="file"
-          id="chart-file"
-          accept="image/jpeg,image/png,image/webp,image/*"
-          hidden
-        >
-
-        <div class="upload-icon">
-          📊
-        </div>
-
-        <h4>
-          Importer votre graphique
-        </h4>
-
-        <p>
-          Glissez-déposez votre capture ici
-        </p>
-
-        <p class="upload-or">
-          ou
-        </p>
-
-        <label
-          for="chart-file"
-          class="browse-label"
-        >
-          Parcourir les fichiers
-        </label>
-
-        <small>
-          JPG, PNG ou WebP — maximum 10 MB
-        </small>
-
-      </div>
-
-
-      <!-- =====================================================
-           APERÇU
-      ====================================================== -->
-      <div
-        id="preview-container"
-        class="preview-container hidden"
-      >
-
-        <div class="preview-header">
-
-          <h4>
-            Aperçu du graphique
-          </h4>
-
-          <span id="file-name">
-            Graphique sélectionné
-          </span>
+            <span>V2</span>
 
         </div>
 
 
-        <div class="preview-image-wrapper">
+        <div class="user-menu">
 
-          <img
-            id="image-preview"
-            src=""
-            alt="Aperçu du graphique"
-          >
+            <span
+                id="user-status"
+                class="header-status"
+            >
+                Vérification...
+            </span>
 
-        </div>
+            <span id="user-email">
+                Chargement...
+            </span>
 
-
-        <div class="preview-actions">
-
-          <button
-            id="analyze-btn"
-            class="btn-primary"
-            type="button"
-          >
-            🔍 Lancer l'analyse SMC
-          </button>
-
-        </div>
-
-      </div>
-
-    </section>
-
-
-
-    <!-- =======================================================
-         SECTION RAPPORT
-    ======================================================== -->
-    <section class="card results-section">
-
-      <div class="section-header">
-
-        <div>
-
-          <h3>
-            Rapport & Signaux SMC
-          </h3>
-
-          <p>
-            Résultat de l'analyse du graphique.
-          </p>
+            <button
+                id="logout-btn"
+                class="btn-secondary"
+                type="button"
+            >
+                Déconnexion
+            </button>
 
         </div>
 
-        <div
-          id="analysis-status"
-          class="analysis-status"
-        >
-          En attente
-        </div>
-
-      </div>
+    </header>
 
 
-      <!-- =====================================================
-           RÉSULTATS
-      ====================================================== -->
-      <div
-        id="results-content"
-        class="results-content"
-      >
 
-        <div class="placeholder-text">
+    <!-- =====================================================
+         CONTENU PRINCIPAL
+    ====================================================== -->
 
-          <div class="placeholder-icon">
-            📈
-          </div>
+    <main class="dashboard-container">
 
-          <h4>
-            Aucun graphique analysé
-          </h4>
 
-          <p>
-            Importez un graphique puis cliquez sur
+        <!-- =================================================
+             SCANNER
+        ================================================== -->
+
+        <section class="card upload-section">
+
+            <div class="section-header">
+
+                <div>
+
+                    <h3>
+                        Scanner un graphique
+                    </h3>
+
+                    <p>
+                        Importez une capture d'écran de votre
+                        graphique. ARKAS SCAN AI analyse la
+                        structure du marché, la liquidité,
+                        les Order Blocks, les FVG, le BOS,
+                        le CHoCH et le Price Action.
+                    </p>
+
+                </div>
+
+
+                <div class="engine-badge">
+                    ARKAS AI
+                </div>
+
+            </div>
+
+
+
+            <!-- ZONE D'UPLOAD -->
+
+            <div
+                class="drop-zone"
+                id="dropZone"
+                role="button"
+                tabindex="0"
+                aria-label="Importer un graphique"
+            >
+
+                <input
+                    type="file"
+                    id="chart-file"
+                    accept="image/jpeg,image/png,image/webp,image/*"
+                    hidden
+                >
+
+
+                <div class="upload-icon">
+                    📊
+                </div>
+
+
+                <h4>
+                    Importer votre graphique
+                </h4>
+
+
+                <p>
+                    Glissez-déposez votre capture ici
+                </p>
+
+
+                <p class="upload-or">
+                    ou
+                </p>
+
+
+                <label
+                    for="chart-file"
+                    class="browse-label"
+                >
+                    Parcourir les fichiers
+                </label>
+
+
+                <small>
+                    JPG, PNG ou WebP — maximum 10 MB
+                </small>
+
+            </div>
+
+
+
+            <!-- =================================================
+                 APERÇU
+            ================================================== -->
+
+            <div
+                id="preview-container"
+                class="preview-container hidden"
+            >
+
+                <div class="preview-header">
+
+                    <h4>
+                        Aperçu du graphique
+                    </h4>
+
+                    <span id="file-name">
+                        Graphique sélectionné
+                    </span>
+
+                </div>
+
+
+                <div class="preview-image-wrapper">
+
+                    <img
+                        id="image-preview"
+                        src=""
+                        alt="Aperçu du graphique"
+                    >
+
+                </div>
+
+
+                <div class="preview-actions">
+
+                    <button
+                        id="analyze-btn"
+                        class="btn-primary"
+                        type="button"
+                    >
+                        🔍 Lancer l'analyse SMC
+                    </button>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+             RESULTATS
+        ================================================== -->
+
+        <section class="card results-section">
+
+            <div class="section-header">
+
+                <div>
+
+                    <h3>
+                        Rapport & Signaux SMC
+                    </h3>
+
+                    <p>
+                        Résultat de l'analyse du graphique.
+                    </p>
+
+                </div>
+
+
+                <div
+                    id="analysis-status"
+                    class="analysis-status"
+                >
+                    En attente
+                </div>
+
+            </div>
+
+
+
+            <!-- =================================================
+                 CONTENEUR DES RESULTATS
+            ================================================== -->
+
+            <div
+                id="results-content"
+                class="results-content"
+            >
+
+                <div class="placeholder-text">
+
+                    <div class="placeholder-icon">
+                        📈
+                    </div>
+
+
+                    <h4>
+                        Aucun graphique analysé
+                    </h4>
+
+
+                    <p>
+                        Importez un graphique puis cliquez sur
+                        <strong>
+                            "Lancer l'analyse SMC"
+                        </strong>
+                        pour obtenir :
+                    </p>
+
+
+                    <ul class="analysis-list">
+
+                        <li>
+                            Direction BUY / SELL / WAIT
+                        </li>
+
+                        <li>
+                            Score ARKAS /100
+                        </li>
+
+                        <li>
+                            Entry
+                        </li>
+
+                        <li>
+                            Stop Loss
+                        </li>
+
+                        <li>
+                            Take Profit
+                        </li>
+
+                        <li>
+                            BOS / CHoCH
+                        </li>
+
+                        <li>
+                            Order Block
+                        </li>
+
+                        <li>
+                            Fair Value Gap
+                        </li>
+
+                        <li>
+                            Liquidité
+                        </li>
+
+                        <li>
+                            Confirmation Price Action
+                        </li>
+
+                        <li>
+                            Risk / Reward
+                        </li>
+
+                    </ul>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+             METHODE
+        ================================================== -->
+
+        <section class="card method-section">
+
+            <h3>
+                Comment fonctionne ARKAS SCAN AI ?
+            </h3>
+
+
+            <div class="method-grid">
+
+
+                <div class="method-item">
+
+                    <div class="method-icon">
+                        01
+                    </div>
+
+                    <h4>
+                        Structure
+                    </h4>
+
+                    <p>
+                        Détection du BOS, du CHoCH et de la
+                        tendance dominante du marché.
+                    </p>
+
+                </div>
+
+
+
+                <div class="method-item">
+
+                    <div class="method-icon">
+                        02
+                    </div>
+
+                    <h4>
+                        Liquidité
+                    </h4>
+
+                    <p>
+                        Recherche des zones de liquidité et
+                        des éventuels balayages de liquidité.
+                    </p>
+
+                </div>
+
+
+
+                <div class="method-item">
+
+                    <div class="method-icon">
+                        03
+                    </div>
+
+                    <h4>
+                        OB & FVG
+                    </h4>
+
+                    <p>
+                        Identification des Order Blocks et
+                        Fair Value Gaps pouvant servir de
+                        zones d'intérêt.
+                    </p>
+
+                </div>
+
+
+
+                <div class="method-item">
+
+                    <div class="method-icon">
+                        04
+                    </div>
+
+                    <h4>
+                        Validation
+                    </h4>
+
+                    <p>
+                        Vérification de l'entrée, du Stop Loss,
+                        des Take Profits et du Risk/Reward.
+                    </p>
+
+                </div>
+
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+             AVERTISSEMENT
+        ================================================== -->
+
+        <section class="risk-notice">
+
             <strong>
-              "Lancer l'analyse SMC"
+                ⚠️ Avertissement
             </strong>
-            pour obtenir :
-          </p>
 
-          <ul class="analysis-list">
+            <p>
+                ARKAS SCAN AI fournit une analyse technique
+                basée sur les informations visibles sur le
+                graphique. Ce résultat ne constitue pas une
+                garantie de profit ni un conseil financier.
+                Vérifiez toujours l'analyse avant de prendre
+                une décision de trading.
+            </p>
 
-            <li>Direction BUY / SELL / WAIT</li>
+        </section>
 
-            <li>Score ARKAS /100</li>
 
-            <li>Entry</li>
-
-            <li>Stop Loss</li>
-
-            <li>Take Profit</li>
-
-            <li>BOS / CHoCH</li>
-
-            <li>Order Block</li>
-
-            <li>Fair Value Gap</li>
-
-            <li>Liquidité</li>
-
-            <li>Confirmation Price Action</li>
-
-            <li>Risk / Reward</li>
-
-          </ul>
-
-        </div>
-
-      </div>
-
-    </section>
+    </main>
 
 
 
-    <!-- =======================================================
-         INFORMATIONS SUR LA MÉTHODE
-    ======================================================== -->
-    <section class="card method-section">
+    <!-- =====================================================
+         SCRIPTS
+    ====================================================== -->
 
-      <h3>
-        Comment fonctionne ARKAS SCAN AI ?
-      </h3>
+    <!--
+        IMPORTANT :
+        app.js gère Firebase :
+        - protection du dashboard
+        - utilisateur connecté
+        - email
+        - déconnexion
+    -->
 
-      <div class="method-grid">
-
-        <div class="method-item">
-
-          <div class="method-icon">
-            01
-          </div>
-
-          <h4>
-            Structure
-          </h4>
-
-          <p>
-            Détection du BOS, du CHoCH et de la tendance
-            dominante du marché.
-          </p>
-
-        </div>
+    <script
+        type="module"
+        src="app.js"
+    ></script>
 
 
-        <div class="method-item">
+    <!--
+        dashboard.js gère :
+        - import du graphique
+        - aperçu
+        - envoi vers Vercel
+        - analyse Gemini
+        - affichage du résultat
+    -->
 
-          <div class="method-icon">
-            02
-          </div>
+    <script
+        type="module"
+        src="dashboard.js"
+    ></script>
 
-          <h4>
-            Liquidité
-          </h4>
-
-          <p>
-            Recherche des zones de liquidité et des
-            éventuels balayages de liquidité.
-          </p>
-
-        </div>
-
-
-        <div class="method-item">
-
-          <div class="method-icon">
-            03
-          </div>
-
-          <h4>
-            OB & FVG
-          </h4>
-
-          <p>
-            Identification des Order Blocks et Fair Value
-            Gaps pouvant servir de zones d'intérêt.
-          </p>
-
-        </div>
-
-
-        <div class="method-item">
-
-          <div class="method-icon">
-            04
-          </div>
-
-          <h4>
-            Validation
-          </h4>
-
-          <p>
-            Vérification de l'entrée, du Stop Loss,
-            des Take Profits et du Risk/Reward.
-          </p>
-
-        </div>
-
-      </div>
-
-    </section>
-
-
-
-    <!-- =======================================================
-         AVERTISSEMENT
-    ======================================================== -->
-    <section class="risk-notice">
-
-      <strong>
-        ⚠️ Avertissement
-      </strong>
-
-      <p>
-        ARKAS SCAN AI fournit une analyse technique
-        basée sur les informations visibles sur le graphique.
-        Ce résultat ne constitue pas une garantie de profit
-        ni un conseil financier. Vérifiez toujours l'analyse
-        avant de prendre une décision de trading.
-      </p>
-
-    </section>
-
-  </main>
-
-
-  <!-- =========================================================
-       JAVASCRIPT
-  ========================================================== -->
-  <script type="module" src="dashboard.js"></script>
 
 </body>
 </html>

@@ -14,7 +14,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
 // Clé Gemini
-const GEMINI_API_KEY = "AQ.Ab8RN6KpDzP_kUB1bNvmRtGZZoVUA5STlhoMcHDF_o2wEO77cw";
+const GEMINI_API_KEY = "AIzaSyDu813q7nn6oWDvZHt6lP8ewKlMMtI6SsQ";
 
 let base64Image = null;
 

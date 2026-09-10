@@ -1,31 +1,46 @@
 // ============================================================
-// CONFIGURATION DU PROXY SÉCURISÉ (VERCEL / SERVERLESS)
+// CONFIGURATION DU PROXY SÉCURISÉ (VERCEL)
 // ============================================================
-// Remplacez cette URL par l'URL exacte générée lors de votre déploiement Vercel
 const PROXY_API_URL = "https://votre-projet.vercel.app/api/analyze";
 
-/**
- * Fonction d'analyse graphique SMC via le proxy Serverless
- * @param {string} base64Image - L'image du graphique encodée en Base64 (sans le prefixe data:image/...)
- * @param {string} customPrompt - Instructions spécifiques pour l'analyse Smart Money Concepts
- */
+// ============================================================
+// PREVISUALISATION DE L'IMAGE LORS DE LA SÉLECTION
+// ============================================================
+const chartInput = document.getElementById('chartInput');
+const imagePreview = document.getElementById('imagePreview'); // L'élément <img> pour afficher l'image
+
+if (chartInput) {
+  chartInput.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        if (imagePreview) {
+          imagePreview.src = event.target.result;
+          imagePreview.style.display = 'block'; // Affiche l'image
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+}
+
+// ============================================================
+// FONCTION D'ANALYSE ET ENVOI AU PROXY
+// ============================================================
 async function analyzeChartSMC(base64Image, customPrompt) {
   const defaultPrompt = "Analyse ce graphique de trading selon la stratégie Smart Money Concepts (SMC). " +
-                        "Identifie les structures clés : Order Blocks (OB), Fair Value Gaps (FVG), " +
-                        "Liquidity Sweeps, Break of Structure (BOS), et Change of Character (CHoCH). " +
-                        "Fournis un plan de trade précis avec point d'entrée, Stop Loss et Take Profit.";
+                        "Identifie les Order Blocks (OB), Fair Value Gaps (FVG), Liquidity Sweeps, BOS et CHoCH. " +
+                        "Fournis un plan de trade avec point d'entrée, Stop Loss et Take Profit.";
 
   const promptToSend = customPrompt || defaultPrompt;
 
-  // Notification visuelle de début de traitement
   showLoader(true);
 
   try {
     const response = await fetch(PROXY_API_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         imageBase64: base64Image,
         prompt: promptToSend
@@ -39,96 +54,71 @@ async function analyzeChartSMC(base64Image, customPrompt) {
 
     const data = await response.json();
     
-    // Traitement et affichage des résultats Gemini
     if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
       const analysisResult = data.candidates[0].content.parts[0].text;
       displayResults(analysisResult);
     } else {
-      throw new Error("Format de réponse invalide ou analyse vide.");
+      throw new Error("Réponse vide du modèle.");
     }
 
   } catch (error) {
-    console.error("Erreur lors de l'analyse SMC :", error);
-    displayError("Impossible de réaliser l'analyse. " + error.message);
+    console.error("Erreur lors de l'analyse :", error);
+    displayError("Impossible de réaliser l'analyse : " + error.message);
   } finally {
     showLoader(false);
   }
 }
 
 // ============================================================
-// FONCTIONS UTILITAIRES ET GESTION DE L'INTERFACE (UI)
+// CONVERSION FILE TO BASE64 ET SOUMISSION
 // ============================================================
-
-/**
- * Convertit un fichier Image issu d'un input HTML en chaîne Base64
- * @param {File} file 
- * @returns {Promise<string>}
- */
 function convertFileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => {
-      // Enlève le préfixe data:image/png;base64, pour ne garder que les données brutes
-      const base64String = reader.result.split(',')[1];
-      resolve(base64String);
-    };
+    reader.onload = () => resolve(reader.result.split(',')[1]);
     reader.onerror = error => reject(error);
     reader.readAsDataURL(file);
   });
 }
 
-/**
- * Gestionnaire d'événement sur l'envoi du formulaire ou du bouton de scan
- */
 document.getElementById('scanForm')?.addEventListener('submit', async (e) => {
   e.preventDefault();
   
-  const fileInput = document.getElementById('chartInput');
-  const promptInput = document.getElementById('promptInput');
-
-  if (!fileInput || !fileInput.files[0]) {
-    alert("Veuillez sélectionner une capture d'écran du graphique.");
+  if (!chartInput || !chartInput.files[0]) {
+    alert("Veuillez sélectionner une image avant de lancer le scan.");
     return;
   }
 
   try {
-    const file = fileInput.files[0];
+    const file = chartInput.files[0];
     const base64Image = await convertFileToBase64(file);
+    const promptInput = document.getElementById('promptInput');
     const promptText = promptInput ? promptInput.value : "";
 
     await analyzeChartSMC(base64Image, promptText);
   } catch (err) {
-    displayError("Erreur lors de la lecture de l'image.");
+    displayError("Erreur lors du traitement du fichier.");
   }
 });
 
-/**
- * Affiche ou masque l'indicateur de chargement
- */
+// ============================================================
+// AFFICHAGE ET ÉTATS DE L'INTERFACE
+// ============================================================
 function showLoader(isLoading) {
   const loader = document.getElementById('loadingSpinner');
-  if (loader) {
-    loader.style.display = isLoading ? 'block' : 'none';
-  }
+  if (loader) loader.style.display = isLoading ? 'block' : 'none';
 }
 
-/**
- * Injection du résultat de l'analyse dans le DOM
- */
 function displayResults(text) {
   const outputContainer = document.getElementById('analysisOutput');
   if (outputContainer) {
-    // Si vous utilisez une librairie comme marked.js, vous pouvez convertir le markdown en HTML
     outputContainer.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : `<pre>${text}</pre>`;
   }
 }
 
-/**
- * Affichage des messages d'erreur
- */
 function displayError(errorMessage) {
   const outputContainer = document.getElementById('analysisOutput');
   if (outputContainer) {
-    outputContainer.innerHTML = `<div class="error-box" style="color: red; font-weight: bold;">⚠️ ${errorMessage}</div>`;
+    outputContainer.innerHTML = `<div style="color: red; font-weight: bold;">⚠️ ${errorMessage}</div>`;
   }
 }

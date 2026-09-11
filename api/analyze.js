@@ -444,7 +444,7 @@ Analyse maintenant l'image fournie.
     ====================================================== */
 
     const geminiUrl =
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key="
         + encodeURIComponent(apiKey);
 
 

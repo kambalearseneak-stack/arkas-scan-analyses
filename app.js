@@ -1,7 +1,7 @@
 /* =========================================================
    ARKAS SCAN AI V2
-   app.js
-   Firebase Authentication
+   app.js — Firebase Authentication
+   Login / Signup / Logout / Protection dashboard
    ========================================================= */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -38,52 +38,68 @@ const auth = getAuth(app);
 
 
 /* =========================================================
-   DETECTION DE LA PAGE
+   DÉTECTION DE LA PAGE
    ========================================================= */
 
-const currentPage = window.location.pathname.split("/").pop().toLowerCase();
+const path =
+    window.location.pathname
+        .split("/")
+        .pop()
+        .toLowerCase();
 
 const isLoginPage =
-    currentPage === "" ||
-    currentPage === "index.html";
+    path === "" ||
+    path === "index.html";
 
 const isDashboardPage =
-    currentPage === "dashboard.html";
+    path === "dashboard.html" ||
+    path === "dashboard";
 
 
 /* =========================================================
-   VARIABLES LOGIN
+   RÉFÉRENCES DOM (LOGIN)
    ========================================================= */
 
 let isSignUpMode = false;
 
-const loginForm = document.getElementById("login-form")
-    || document.querySelector(".login-form");
+const loginForm =
+    document.getElementById("login-form");
 
-const formTitle = document.getElementById("form-title");
-const formSubtitle = document.getElementById("form-subtitle");
+const formTitle =
+    document.getElementById("form-title");
 
-const submitBtn = document.getElementById("submit-btn");
+const formSubtitle =
+    document.getElementById("form-subtitle");
 
-const toggleModeBtn = document.getElementById("toggle-mode");
-const toggleText = document.getElementById("toggle-text");
+const submitBtn =
+    document.getElementById("submit-btn");
 
-const errorMessage = document.getElementById("error-message");
+const toggleModeBtn =
+    document.getElementById("toggle-mode");
 
-const emailInput = document.getElementById("email");
-const passwordInput = document.getElementById("password");
+const toggleLabel =
+    document.getElementById("toggle-label");
+
+const errorMessage =
+    document.getElementById("error-message");
+
+const emailInput =
+    document.getElementById("email");
+
+const passwordInput =
+    document.getElementById("password");
 
 
 /* =========================================================
-   FONCTIONS UTILITAIRES
+   UTILITAIRES UI
    ========================================================= */
 
 function showError(message) {
 
     if (errorMessage) {
         errorMessage.textContent = message;
-        errorMessage.style.display = "block";
         errorMessage.classList.add("show");
+        errorMessage.style.display = "block";
     } else {
         alert(message);
     }
@@ -94,8 +110,8 @@ function clearError() {
 
     if (errorMessage) {
         errorMessage.textContent = "";
-        errorMessage.style.display = "none";
         errorMessage.classList.remove("show");
+        errorMessage.style.display = "none";
     }
 }
 
@@ -107,19 +123,11 @@ function setButtonLoading(loading) {
     submitBtn.disabled = loading;
 
     if (loading) {
-
-        submitBtn.dataset.originalText =
-            isSignUpMode
-                ? "S'inscrire"
-                : "Se connecter";
-
         submitBtn.textContent =
             isSignUpMode
-                ? "Création du compte..."
-                : "Connexion en cours...";
-
+                ? "Création du compte…"
+                : "Connexion en cours…";
     } else {
-
         submitBtn.textContent =
             isSignUpMode
                 ? "S'inscrire"
@@ -162,13 +170,13 @@ function getFirebaseErrorMessage(error) {
             return "Le mot de passe ne respecte pas les exigences de sécurité.";
 
         case "auth/too-many-requests":
-            return "Trop de tentatives. Veuillez patienter quelques minutes.";
+            return "Trop de tentatives. Patientez quelques minutes.";
 
         case "auth/network-request-failed":
             return "Problème de connexion Internet. Vérifiez votre réseau.";
 
         case "auth/operation-not-allowed":
-            return "La connexion par email/mot de passe n'est pas activée dans Firebase.";
+            return "La connexion email/mot de passe n'est pas activée dans Firebase.";
 
         case "auth/user-disabled":
             return "Ce compte a été désactivé.";
@@ -185,7 +193,7 @@ function getFirebaseErrorMessage(error) {
 
 
 /* =========================================================
-   MODE CONNEXION / INSCRIPTION
+   MODE CONNEXION ↔ INSCRIPTION
    ========================================================= */
 
 function updateFormMode() {
@@ -201,13 +209,12 @@ function updateFormMode() {
                 "Créez votre compte ARKAS SCAN AI pour accéder au scanner SMC";
         }
 
-        if (submitBtn) {
+        if (submitBtn && !submitBtn.disabled) {
             submitBtn.textContent = "S'inscrire";
         }
 
-        if (toggleText) {
-            toggleText.childNodes[0].nodeValue =
-                "Vous avez déjà un compte ? ";
+        if (toggleLabel) {
+            toggleLabel.textContent = "Vous avez déjà un compte ?";
         }
 
         if (toggleModeBtn) {
@@ -229,13 +236,12 @@ function updateFormMode() {
                 "Connectez-vous pour accéder à vos analyses SMC";
         }
 
-        if (submitBtn) {
+        if (submitBtn && !submitBtn.disabled) {
             submitBtn.textContent = "Se connecter";
         }
 
-        if (toggleText) {
-            toggleText.childNodes[0].nodeValue =
-                "Pas encore de compte ? ";
+        if (toggleLabel) {
+            toggleLabel.textContent = "Pas encore de compte ?";
         }
 
         if (toggleModeBtn) {
@@ -250,7 +256,7 @@ function updateFormMode() {
 
 
 /* =========================================================
-   BASCULER ENTRE LOGIN ET SIGNUP
+   TOGGLE LOGIN/SIGNUP
    ========================================================= */
 
 if (toggleModeBtn) {
@@ -273,7 +279,7 @@ if (toggleModeBtn) {
 
 
 /* =========================================================
-   CONNEXION / INSCRIPTION
+   SUBMIT — LOGIN OU SIGNUP
    ========================================================= */
 
 if (loginForm) {
@@ -285,19 +291,12 @@ if (loginForm) {
         clearError();
 
         const email =
-            emailInput
-                ? emailInput.value.trim()
-                : "";
+            emailInput ? emailInput.value.trim() : "";
 
         const password =
-            passwordInput
-                ? passwordInput.value
-                : "";
+            passwordInput ? passwordInput.value : "";
 
-
-        /* -------------------------------------------------
-           VALIDATION
-           ------------------------------------------------- */
+        /* -------- Validation -------- */
 
         if (!email) {
             showError("Veuillez entrer votre adresse email.");
@@ -312,27 +311,19 @@ if (loginForm) {
         }
 
         if (password.length < 6) {
-            showError(
-                "Le mot de passe doit contenir au moins 6 caractères."
-            );
+            showError("Le mot de passe doit contenir au moins 6 caractères.");
             if (passwordInput) passwordInput.focus();
             return;
         }
 
-
-        /* -------------------------------------------------
-           CHARGEMENT
-           ------------------------------------------------- */
-
         setButtonLoading(true);
-
 
         try {
 
             if (isSignUpMode) {
 
                 /* =========================================
-                   CREATION DU COMPTE
+                   INSCRIPTION
                    ========================================= */
 
                 const userCredential =
@@ -343,14 +334,9 @@ if (loginForm) {
                     );
 
                 console.log(
-                    "Compte créé :",
+                    "✅ Compte créé :",
                     userCredential.user.email
                 );
-
-                /*
-                 * Firebase connecte automatiquement
-                 * l'utilisateur après la création.
-                 */
 
                 window.location.replace("dashboard.html");
 
@@ -368,7 +354,7 @@ if (loginForm) {
                     );
 
                 console.log(
-                    "Connexion réussie :",
+                    "✅ Connexion réussie :",
                     userCredential.user.email
                 );
 
@@ -377,10 +363,7 @@ if (loginForm) {
 
         } catch (error) {
 
-            console.error(
-                "Erreur Firebase :",
-                error
-            );
+            console.error("❌ Erreur Firebase :", error);
 
             setButtonLoading(false);
 
@@ -393,29 +376,21 @@ if (loginForm) {
 
 
 /* =========================================================
-   PROTECTION DU DASHBOARD
+   PROTECTION DES PAGES
    ========================================================= */
 
 onAuthStateChanged(auth, function (user) {
 
     /* =====================================================
-       PAGE DE CONNEXION
+       PAGE LOGIN
        ===================================================== */
 
     if (isLoginPage) {
 
         if (user) {
-
-            /*
-             * L'utilisateur est déjà connecté.
-             * Il n'a pas besoin de revoir la page login.
-             */
-
             console.log(
-                "Utilisateur déjà connecté :",
-                user.email
+                "ℹ️ Utilisateur déjà connecté → dashboard"
             );
-
             window.location.replace("dashboard.html");
         }
 
@@ -430,78 +405,43 @@ onAuthStateChanged(auth, function (user) {
     if (isDashboardPage) {
 
         if (!user) {
-
-            /*
-             * Aucun utilisateur connecté.
-             * Retour obligatoire vers la connexion.
-             */
-
             console.log(
-                "Accès dashboard refusé : utilisateur non connecté."
+                "🚫 Accès dashboard refusé → login"
             );
-
             window.location.replace("index.html");
-
             return;
         }
 
-
-        /* -------------------------------------------------
-           UTILISATEUR CONNECTÉ
-           ------------------------------------------------- */
-
         console.log(
-            "Utilisateur authentifié :",
+            "✅ Dashboard — utilisateur :",
             user.email
         );
 
-
-        /* -------------------------------------------------
-           AFFICHER EMAIL
-           ------------------------------------------------- */
-
+        /* -------- Affichage email -------- */
         const userEmail =
             document.getElementById("user-email");
 
         if (userEmail) {
-
-            userEmail.textContent =
-                user.email || "Utilisateur";
+            userEmail.textContent = user.email || "Utilisateur";
         }
 
-
-        /* -------------------------------------------------
-           STATUS
-           ------------------------------------------------- */
-
-        const userStatus =
-            document.getElementById("user-status");
-
-        if (userStatus) {
-
-            userStatus.textContent = "Connecté";
-        }
-
-
+        /* -------- Status analyse -------- */
         const analysisStatus =
             document.getElementById("analysis-status");
 
         if (analysisStatus) {
-
-            analysisStatus.textContent =
-                "Prêt";
+            analysisStatus.textContent = "Prêt";
         }
     }
 });
 
 
 /* =========================================================
-   DECONNEXION
+   DÉCONNEXION
    ========================================================= */
 
 const logoutBtn =
     document.getElementById("logout-btn");
-
 
 if (logoutBtn) {
 
@@ -511,24 +451,19 @@ if (logoutBtn) {
             logoutBtn.textContent;
 
         logoutBtn.disabled = true;
-        logoutBtn.textContent = "Déconnexion...";
+        logoutBtn.textContent = "Déconnexion…";
 
         try {
 
             await signOut(auth);
 
-            console.log(
-                "Utilisateur déconnecté."
-            );
+            console.log("👋 Déconnecté");
 
             window.location.replace("index.html");
 
         } catch (error) {
 
-            console.error(
-                "Erreur de déconnexion :",
-                error
-            );
+            console.error("Erreur déconnexion :", error);
 
             logoutBtn.disabled = false;
             logoutBtn.textContent = originalText;
@@ -545,8 +480,8 @@ if (logoutBtn) {
    INITIALISATION
    ========================================================= */
 
-updateFormMode();
+if (isLoginPage) {
+    updateFormMode();
+}
 
-console.log(
-    "ARKAS SCAN AI V2 — Firebase Authentication chargé."
-);
+console.log("ARKAS SCAN AI V2 — Auth chargé ✅");

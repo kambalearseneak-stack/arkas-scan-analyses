@@ -1,100 +1,106 @@
-// ============================================================
-// ARKAS SCAN AI V2 - DASHBOARD.JS
-// Import automatique + détection actif/timeframe
-// ============================================================
-
-const fileInput = document.getElementById("chart-file");
-const dropZone = document.getElementById("dropZone");
-const importBtn = document.getElementById("import-btn");
-
-const previewContainer = document.getElementById("preview-container");
-const imagePreview = document.getElementById("image-preview");
-const fileNameEl = document.getElementById("file-name");
-
-const detectedInfo = document.getElementById("detected-info");
-const detectedAsset = document.getElementById("detected-asset");
-const detectedTimeframe = document.getElementById("detected-timeframe");
-
-const scannerActions = document.getElementById("scanner-actions");
-const analyzeBtn = document.getElementById("analyze-btn");
-const auditBtn = document.getElementById("auditBtn");
-
-const analysisStatus = document.getElementById("analysis-status");
-const resultsContent = document.getElementById("results-content");
-const resultsSection = document.getElementById("results-section");
-
-let selectedFile = null;
-let selectedBase64 = null;
-let selectedMimeType = null;
-let isProcessing = false;
-
-// ============================================================
-// INITIALISATION
-// ============================================================
+/* =========================================================
+   ARKAS SCAN AI V2 — DASHBOARD
+   Scanner + Audit + Détection automatique
+   + Effet visuel SCAN AI
+   ========================================================= */
 
 document.addEventListener("DOMContentLoaded", () => {
-    setupUpload();
-    setupButtons();
-});
+    const fileInput = document.getElementById("chart-file");
+    const importBtn = document.getElementById("import-btn");
+    const dropZone = document.getElementById("dropZone");
 
-// ============================================================
-// IMPORT IMAGE
-// ============================================================
+    const previewContainer = document.getElementById("preview-container");
+    const imagePreview = document.getElementById("image-preview");
+    const fileName = document.getElementById("file-name");
 
-function setupUpload() {
+    const detectedInfo = document.getElementById("detected-info");
+    const detectedAsset = document.getElementById("detected-asset");
+    const detectedTimeframe = document.getElementById("detected-timeframe");
 
-    // Bouton principal
-    if (importBtn) {
+    const scannerActions = document.getElementById("scanner-actions");
+    const analyzeBtn = document.getElementById("analyze-btn");
+    const auditBtn = document.getElementById("auditBtn");
+
+    const analysisStatus = document.getElementById("analysis-status");
+
+    const resultsSection = document.getElementById("results-section");
+    const resultsContent = document.getElementById("results-content");
+
+    let selectedFile = null;
+    let selectedBase64 = null;
+    let selectedMimeType = null;
+    let isProcessing = false;
+
+    /* =========================================================
+       INITIALISATION
+       ========================================================= */
+
+    if (scannerActions) {
+        scannerActions.style.display = "none";
+    }
+
+    if (detectedInfo) {
+        detectedInfo.style.display = "none";
+    }
+
+    if (resultsSection) {
+        resultsSection.style.display = "none";
+    }
+
+    /* =========================================================
+       IMPORTATION
+       ========================================================= */
+
+    if (importBtn && fileInput) {
         importBtn.addEventListener("click", (event) => {
+            event.preventDefault();
             event.stopPropagation();
 
-            if (fileInput) {
-                fileInput.value = "";
+            if (!isProcessing) {
                 fileInput.click();
             }
         });
     }
 
-    // Zone entière
-    if (dropZone) {
+    if (dropZone && fileInput) {
         dropZone.addEventListener("click", (event) => {
 
-            // Ne pas déclencher deux fois si on clique sur le bouton
-            if (event.target.closest("#import-btn")) {
+            if (event.target.closest("button")) {
                 return;
             }
 
-            if (fileInput) {
-                fileInput.value = "";
+            if (!isProcessing) {
                 fileInput.click();
             }
         });
 
-        // Clavier
         dropZone.addEventListener("keydown", (event) => {
-            if (event.key === "Enter" || event.key === " ") {
+            if (
+                (event.key === "Enter" || event.key === " ") &&
+                !isProcessing
+            ) {
                 event.preventDefault();
-
-                if (fileInput) {
-                    fileInput.value = "";
-                    fileInput.click();
-                }
+                fileInput.click();
             }
         });
 
-        // Drag & Drop ordinateur
         dropZone.addEventListener("dragover", (event) => {
             event.preventDefault();
-            dropZone.classList.add("drag-active");
+
+            if (!isProcessing) {
+                dropZone.classList.add("drag-over");
+            }
         });
 
         dropZone.addEventListener("dragleave", () => {
-            dropZone.classList.remove("drag-active");
+            dropZone.classList.remove("drag-over");
         });
 
         dropZone.addEventListener("drop", (event) => {
             event.preventDefault();
-            dropZone.classList.remove("drag-active");
+            dropZone.classList.remove("drag-over");
+
+            if (isProcessing) return;
 
             const files = event.dataTransfer.files;
 
@@ -104,93 +110,76 @@ function setupUpload() {
         });
     }
 
-    // Sélection depuis Android / ordinateur
     if (fileInput) {
-        fileInput.addEventListener("change", (event) => {
+        fileInput.addEventListener("change", () => {
 
-            const files = event.target.files;
-
-            if (!files || files.length === 0) {
+            if (!fileInput.files || !fileInput.files.length) {
                 return;
             }
 
-            handleFile(files[0]);
+            handleFile(fileInput.files[0]);
         });
     }
-}
 
-// ============================================================
-// VALIDATION DU FICHIER
-// ============================================================
+    /* =========================================================
+       GESTION DU FICHIER
+       ========================================================= */
 
-function handleFile(file) {
+    function handleFile(file) {
 
-    if (!file) {
-        return;
-    }
+        if (!file) return;
 
-    const allowedTypes = [
-        "image/jpeg",
-        "image/png",
-        "image/webp"
-    ];
+        stopScanAnimation();
 
-    const maxSize = 10 * 1024 * 1024;
+        const allowedTypes = [
+            "image/jpeg",
+            "image/png",
+            "image/webp"
+        ];
 
-    if (!allowedTypes.includes(file.type)) {
+        const maxSize = 10 * 1024 * 1024;
+
+        if (!allowedTypes.includes(file.type)) {
+
+            showStatus(
+                "❌ Format non supporté. Utilise JPG, PNG ou WEBP.",
+                "error"
+            );
+
+            return;
+        }
+
+        if (file.size > maxSize) {
+
+            showStatus(
+                "❌ Image trop lourde. Maximum : 10 MB.",
+                "error"
+            );
+
+            return;
+        }
+
+        selectedFile = file;
+        selectedMimeType = file.type;
+
         showStatus(
-            "❌ Format non supporté. Utilise JPG, PNG ou WEBP.",
-            "error"
+            "📷 Capture importée. Préparation du scanner…",
+            "info"
         );
-        return;
-    }
 
-    if (file.size > maxSize) {
-        showStatus(
-            "❌ Image trop lourde. Maximum : 10 MB.",
-            "error"
-        );
-        return;
-    }
+        const reader = new FileReader();
 
-    selectedFile = file;
-    selectedMimeType = file.type;
+        reader.onload = (event) => {
 
-    showStatus(
-        "⏳ Chargement de la capture...",
-        "loading"
-    );
+            selectedBase64 = event.target.result;
 
-    readImage(file);
-}
-
-// ============================================================
-// LECTURE IMAGE
-// ============================================================
-
-function readImage(file) {
-
-    const reader = new FileReader();
-
-    reader.onload = function(event) {
-
-        try {
-
-            const result = event.target.result;
-
-            if (!result || typeof result !== "string") {
-                throw new Error("Image illisible");
-            }
-
-            selectedBase64 = result;
-
-            // Aperçu immédiat
             if (imagePreview) {
-                imagePreview.src = result;
+                imagePreview.src = selectedBase64;
+                imagePreview.style.display = "block";
             }
 
-            if (fileNameEl) {
-                fileNameEl.textContent = file.name;
+            if (fileName) {
+                fileName.textContent = file.name;
             }
 
             if (previewContainer) {
@@ -198,1097 +187,1199 @@ function readImage(file) {
             }
 
             if (detectedInfo) {
-                detectedInfo.style.display = "grid";
+                detectedInfo.style.display = "block";
+            }
+
+            if (detectedAsset) {
+                detectedAsset.textContent = "Détection automatique…";
+            }
+
+            if (detectedTimeframe) {
+                detectedTimeframe.textContent = "Détection automatique…";
             }
 
             if (scannerActions) {
                 scannerActions.style.display = "flex";
             }
 
-            if (detectedAsset) {
-                detectedAsset.textContent = "Détection automatique";
+            if (resultsSection) {
+                resultsSection.style.display = "none";
             }
 
-            if (detectedTimeframe) {
-                detectedTimeframe.textContent = "Détection automatique";
-            }
-
-            if (dropZone) {
-                dropZone.classList.add("has-image");
-            }
+            setupScanOverlay();
 
             showStatus(
-                "✅ Capture chargée. ARKAS peut maintenant l'analyser.",
+                "✅ Capture prête. Choisis SCANNER ou AUDITER.",
                 "success"
             );
 
-            // Aller doucement vers les boutons sur mobile
-            setTimeout(() => {
-                if (scannerActions) {
-                    scannerActions.scrollIntoView({
-                        behavior: "smooth",
-                        block: "center"
-                    });
-                }
-            }, 250);
+            if (scannerActions) {
+                scannerActions.scrollIntoView({
+                    behavior: "smooth",
+                    block: "center"
+                });
+            }
+        };
 
-        } catch (error) {
-
-            console.error(error);
-
-            resetImage();
+        reader.onerror = () => {
 
             showStatus(
                 "❌ Impossible de lire cette image.",
                 "error"
             );
+        };
+
+        reader.readAsDataURL(file);
+    }
+
+    /* =========================================================
+       EFFET SCAN — CRÉATION AUTOMATIQUE
+       ========================================================= */
+
+    function setupScanOverlay() {
+
+        if (!imagePreview) return null;
+
+        let wrapper = imagePreview.closest(".scan-image-wrapper");
+
+        if (wrapper) {
+            return wrapper;
         }
-    };
 
-    reader.onerror = function() {
+        wrapper = document.createElement("div");
+        wrapper.className = "scan-image-wrapper";
 
-        resetImage();
-
-        showStatus(
-            "❌ Erreur pendant le chargement de l'image.",
-            "error"
-        );
-    };
-
-    reader.readAsDataURL(file);
-}
-
-// ============================================================
-// BOUTONS
-// ============================================================
-
-function setupButtons() {
-
-    if (analyzeBtn) {
-        analyzeBtn.addEventListener("click", () => {
-            sendAnalysis("scan");
-        });
-    }
-
-    if (auditBtn) {
-        auditBtn.addEventListener("click", () => {
-            sendAnalysis("audit");
-        });
-    }
-}
-
-// ============================================================
-// ANALYSE / AUDIT
-// ============================================================
-
-async function sendAnalysis(mode) {
-
-    if (isProcessing) {
-        return;
-    }
-
-    if (!selectedBase64) {
-        showStatus(
-            "⚠️ Importe d'abord une capture.",
-            "error"
-        );
-        return;
-    }
-
-    isProcessing = true;
-
-    setButtonsLoading(true);
-
-    if (mode === "audit") {
-
-        showStatus(
-            "🧪 ARKAS vérifie ton analyse...",
-            "loading"
+        imagePreview.parentNode.insertBefore(
+            wrapper,
+            imagePreview
         );
 
-    } else {
+        wrapper.appendChild(imagePreview);
 
-        showStatus(
-            "🔍 ARKAS analyse la capture...",
-            "loading"
-        );
-    }
+        const overlay = document.createElement("div");
+        overlay.className = "scan-overlay";
 
-    if (resultsContent) {
-        resultsContent.innerHTML = `
-            <div class="empty-result">
-                <div>🧠</div>
-                <h3>Analyse en cours...</h3>
-                <p>ARKAS examine la structure, la liquidité et le Price Action.</p>
+        overlay.innerHTML = `
+            <div class="scan-grid"></div>
+
+            <div class="scan-line"></div>
+
+            <div class="scan-corners">
+                <span class="corner top-left"></span>
+                <span class="corner top-right"></span>
+                <span class="corner bottom-left"></span>
+                <span class="corner bottom-right"></span>
+            </div>
+
+            <div class="scan-center">
+                <div class="scan-loader"></div>
+                <div class="scan-label">
+                    ARKAS SCAN EN COURS…
+                </div>
+                <div class="scan-subtitle">
+                    PRICE ACTION • SMC
+                </div>
+            </div>
+
+            <div class="scan-status">
+                <span class="scan-dot"></span>
+                <span class="scan-status-text">
+                    ANALYZING
+                </span>
             </div>
         `;
+
+        wrapper.appendChild(overlay);
+
+        return wrapper;
     }
 
-    try {
+    /* =========================================================
+       DÉMARRER LE SCAN
+       ========================================================= */
 
-        const cleanBase64 = selectedBase64.includes(",")
-            ? selectedBase64.split(",")[1]
-            : selectedBase64;
+    function startScanAnimation(mode = "scan") {
+
+        const wrapper = setupScanOverlay();
+
+        if (!wrapper) return;
+
+        const label = wrapper.querySelector(".scan-label");
+        const subtitle = wrapper.querySelector(".scan-subtitle");
+        const statusText = wrapper.querySelector(".scan-status-text");
+
+        if (mode === "audit") {
+
+            if (label) {
+                label.textContent =
+                    "ARKAS AUDIT EN COURS…";
+            }
+
+            if (subtitle) {
+                subtitle.textContent =
+                    "VÉRIFICATION DE L’ANALYSE";
+            }
+
+            if (statusText) {
+                statusText.textContent =
+                    "AUDITING";
+            }
+
+        } else {
+
+            if (label) {
+                label.textContent =
+                    "ARKAS SCAN EN COURS…";
+            }
+
+            if (subtitle) {
+                subtitle.textContent =
+                    "PRICE ACTION • SMC";
+            }
+
+            if (statusText) {
+                statusText.textContent =
+                    "ANALYZING";
+            }
+        }
+
+        wrapper.classList.add("is-scanning");
+    }
+
+    /* =========================================================
+       ARRÊTER LE SCAN
+       ========================================================= */
+
+    function stopScanAnimation() {
+
+        const wrapper =
+            document.querySelector(".scan-image-wrapper");
+
+        if (!wrapper) return;
+
+        wrapper.classList.remove("is-scanning");
+    }
+
+    /* =========================================================
+       BOUTON SCANNER
+       ========================================================= */
+
+    if (analyzeBtn) {
+
+        analyzeBtn.addEventListener("click", async () => {
+
+            if (isProcessing) return;
+
+            await analyzeImage("scan");
+        });
+    }
+
+    /* =========================================================
+       BOUTON AUDIT
+       ========================================================= */
+
+    if (auditBtn) {
+
+        auditBtn.addEventListener("click", async () => {
+
+            if (isProcessing) return;
+
+            await analyzeImage("audit");
+        });
+    }
+
+    /* =========================================================
+       ANALYSE PRINCIPALE
+       ========================================================= */
+
+    async function analyzeImage(mode) {
+
+        if (!selectedBase64) {
+
+            showStatus(
+                "⚠️ Importe d’abord une capture.",
+                "error"
+            );
+
+            return;
+        }
+
+        if (isProcessing) return;
+
+        isProcessing = true;
+
+        setButtonsDisabled(true);
+
+        if (resultsSection) {
+            resultsSection.style.display = "none";
+        }
+
+        /*
+         * DÉMARRAGE DE L'EFFET VISUEL
+         */
+        startScanAnimation(mode);
+
+        showStatus(
+            mode === "audit"
+                ? "🔍 ARKAS vérifie ton analyse…"
+                : "🔍 ARKAS analyse le graphique…",
+            "loading"
+        );
+
+        const cleanBase64 =
+            selectedBase64.includes(",")
+                ? selectedBase64.split(",")[1]
+                : selectedBase64;
 
         const prompt =
             mode === "audit"
                 ? buildAuditPrompt()
                 : buildScanPrompt();
 
-        const response = await fetch("/api/analyze", {
-
-            method: "POST",
-
-            headers: {
-                "Content-Type": "application/json"
-            },
-
-            body: JSON.stringify({
-
-                imageBase64: cleanBase64,
-
-                mimeType: selectedMimeType,
-
-                asset: "AUTO",
-
-                timeframe: "AUTO",
-
-                mode: mode,
-
-                prompt: prompt
-            })
-        });
-
-        const rawText = await response.text();
-
-        let data;
-
         try {
-            data = JSON.parse(rawText);
+
+            const response = await fetch(
+                "/api/analyze",
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+
+                    body: JSON.stringify({
+
+                        imageBase64: cleanBase64,
+
+                        mimeType:
+                            selectedMimeType ||
+                            "image/jpeg",
+
+                        asset: "AUTO",
+
+                        timeframe: "AUTO",
+
+                        mode,
+
+                        prompt
+                    })
+                }
+            );
+
+            let data = null;
+
+            try {
+                data = await response.json();
+            } catch (jsonError) {
+                throw new Error(
+                    "Réponse serveur invalide."
+                );
+            }
+
+            if (!response.ok) {
+
+                throw new Error(
+                    data?.error ||
+                    data?.message ||
+                    `Erreur serveur ${response.status}`
+                );
+            }
+
+            if (!data) {
+                throw new Error(
+                    "Aucune réponse reçue."
+                );
+            }
+
+            /*
+             * FIN DU SCAN
+             */
+            stopScanAnimation();
+
+            updateDetectedInfo(data);
+
+            renderResults(data, mode);
+
+            showStatus(
+                mode === "audit"
+                    ? "✅ Audit terminé."
+                    : "✅ Analyse terminée.",
+                "success"
+            );
+
         } catch (error) {
 
-            console.error("Réponse serveur non JSON :", rawText);
-
-            throw new Error(
-                "Le serveur a retourné une réponse invalide."
+            console.error(
+                "ARKAS SCAN ERROR:",
+                error
             );
-        }
 
-        if (!response.ok) {
+            stopScanAnimation();
 
-            throw new Error(
-                data.error ||
-                data.message ||
-                `Erreur serveur HTTP ${response.status}`
+            showStatus(
+                "❌ " +
+                (
+                    error?.message ||
+                    "Impossible de terminer l’analyse."
+                ),
+                "error"
             );
+
+        } finally {
+
+            isProcessing = false;
+
+            setButtonsDisabled(false);
         }
-
-        if (!data) {
-            throw new Error("Réponse vide du serveur.");
-        }
-
-        // Mise à jour détection
-        updateDetection(data);
-
-        // Affichage résultat
-        if (mode === "audit") {
-            renderAudit(data);
-        } else {
-            renderScan(data);
-        }
-
-        showStatus(
-            mode === "audit"
-                ? "✅ Vérification terminée."
-                : "✅ Analyse terminée.",
-            "success"
-        );
-
-        if (resultsSection) {
-            setTimeout(() => {
-                resultsSection.scrollIntoView({
-                    behavior: "smooth",
-                    block: "start"
-                });
-            }, 250);
-        }
-
-    } catch (error) {
-
-        console.error("ARKAS ERROR:", error);
-
-        if (resultsContent) {
-
-            resultsContent.innerHTML = `
-                <div class="empty-result error-result">
-                    <div>❌</div>
-                    <h3>Analyse impossible</h3>
-                    <p>${escapeHtml(error.message)}</p>
-                </div>
-            `;
-        }
-
-        showStatus(
-            "❌ " + error.message,
-            "error"
-        );
-
-    } finally {
-
-        isProcessing = false;
-
-        setButtonsLoading(false);
     }
-}
 
-// ============================================================
-// PROMPT SCAN
-// ============================================================
+    /* =========================================================
+       PROMPT SCAN
+       ========================================================= */
 
-function buildScanPrompt() {
+    function buildScanPrompt() {
 
-    return `
+        return `
 Tu es ARKAS SCAN AI, un analyste spécialisé en Price Action et Smart Money Concepts.
 
+Analyse cette capture de graphique.
+
 IMPORTANT :
-L'utilisateur ne choisit NI l'actif NI le timeframe.
 
-Tu dois donc analyser directement la capture d'écran.
+1. IDENTIFIE AUTOMATIQUEMENT :
+- l'actif
+- le timeframe
 
-DÉTECTION AUTOMATIQUE :
-1. Identifie l'actif si son nom ou symbole est visible.
-2. Identifie le timeframe si celui-ci est visible.
-3. Tu peux détecter notamment :
-   - XAUUSD / GOLD
-   - BTCUSD / BTCUSDT
-   - ETHUSD / ETHUSDT
-   - autres cryptomonnaies
-   - EURUSD
-   - GBPUSD
-   - USDJPY
-   - AUDUSD
-   - USDCAD
-   - USDCHF
-   - indices
-   - autres instruments.
-4. Ne devine jamais un actif ou timeframe qui n'est pas suffisamment visible.
-5. Si impossible à déterminer, retourne "UNKNOWN".
+Tu ne dois PAS demander à l'utilisateur de sélectionner l'actif ou le timeframe.
 
-ANALYSE :
-- Structure du marché
-- Tendance
+Actifs possibles :
+- XAUUSD / GOLD
+- BTCUSD / BTCUSDT
+- ETHUSD / ETHUSDT
+- autres cryptomonnaies
+- Forex
+- indices
+- autres marchés visibles
+
+Si l'actif ou le timeframe n'est pas suffisamment visible :
+retourne UNKNOWN.
+N'invente jamais.
+
+2. ANALYSE :
+- tendance
+- structure
 - BOS
 - CHoCH
-- Liquidité
-- Liquidity sweep
+- liquidité
 - Order Block
-- Fair Value Gap
-- Support
-- Résistance
-- Price Action
-- Breakout
-- Retest
-- Confirmation
-- Zone d'achat
-- Zone de vente
-
-DÉCISION :
-Tu dois choisir parmi :
-- BUY NOW
-- SELL NOW
-- BUY LIMIT
-- SELL LIMIT
-- WAIT
-
-Ne donne pas BUY ou SELL simplement parce que le graphique monte ou descend.
-
-Pour BUY NOW ou SELL NOW :
-donne Entry, SL, TP1, TP2, TP3 et RR.
-
-Pour BUY LIMIT :
-donne le prix exact de l'entrée limite.
-
-Pour SELL LIMIT :
-donne le prix exact de l'entrée limite.
-
-Si la configuration n'est pas suffisamment confirmée :
-WAIT.
-
-DONNE :
-- signal
-- direction
-- execution
-- confidence_percent
-- asset
-- timeframe
-- entry
-- sl
-- tp1
-- tp2
-- tp3
-- rr
-- ARKAS score
-- BOS
-- CHoCH
-- liquidity
-- order block
 - FVG
-- price action
+- support/résistance
+- Price Action
+- momentum
+- qualité de l'entrée
+
+3. SIGNAL :
+Choisis UNE seule possibilité :
+
+BUY NOW
+SELL NOW
+BUY LIMIT
+SELL LIMIT
+WAIT
+
+Si une entrée immédiate n'est pas suffisamment propre,
+préfère LIMIT ou WAIT.
+
+4. DONNE :
+- Entry
+- Stop Loss
+- TP1
+- TP2
+- TP3
+- Risk/Reward
+- confiance %
+- ARKAS Score
+- risque
 - scénario principal
 - scénario alternatif
 - invalidation
-- gestion du risque
-- explication claire.
 
-Si des annotations existent déjà sur la capture, observe-les mais ne les considère PAS automatiquement comme correctes.
+5. NE FORCE PAS UN TRADE.
 
-Ne fabrique aucune actualité économique.
-Si aucune actualité n'est visible ou vérifiable, indique simplement qu'elle n'est pas disponible depuis la capture.
+Une bonne analyse peut parfaitement conclure WAIT.
 
-Réponds uniquement avec le JSON attendu par le serveur.
+6. NEWS :
+Ne fabrique aucune actualité.
+Si tu ne peux pas vérifier une news réelle :
+indique simplement que les news ne sont pas vérifiées.
+
+Réponds uniquement avec les données structurées
+attendues par l'application.
 `;
-}
+    }
 
-// ============================================================
-// PROMPT AUDIT
-// ============================================================
+    /* =========================================================
+       PROMPT AUDIT
+       ========================================================= */
 
-function buildAuditPrompt() {
+    function buildAuditPrompt() {
 
-    return `
-Tu es ARKAS SCAN AI en MODE AUDIT.
+        return `
+Tu es ARKAS SCAN AI en mode AUDIT.
 
-Analyse la capture d'écran comme un contrôleur indépendant.
+La capture contient potentiellement une analyse déjà dessinée
+par l'utilisateur.
 
-L'utilisateur peut avoir déjà placé :
-- BUY
-- SELL
-- Entry
-- SL
-- TP
-- lignes
-- zones
-- flèches
+Ton travail est de vérifier cette analyse.
+
+NE considère PAS automatiquement les annotations comme correctes.
+
+Vérifie indépendamment :
+
+- direction
+- entrée
+- Stop Loss
+- TP1
+- TP2
+- TP3
 - BOS
 - CHoCH
-- Order Blocks
+- Order Block
 - FVG
-- autres annotations.
+- liquidité
+- structure
+- Price Action
+- logique du trade
+- risque/rendement
 
-IMPORTANT :
-Ne considère JAMAIS une annotation comme correcte simplement parce qu'elle est présente.
+Détermine l'un des statuts :
 
-Tu dois déterminer :
-1. L'actif visible.
-2. Le timeframe visible.
-3. La structure réelle du marché.
-4. Si l'analyse de l'utilisateur est cohérente.
-5. Si l'entrée est confirmée ou prématurée.
-6. Si le SL est logique.
-7. Si les TP sont logiques.
-8. Si le RR est acceptable.
-9. Si les zones correspondent réellement au Price Action.
+VALIDATED
+CORRECT
+PREMATURE
+INVALID
+UNCLEAR
 
-STATUT D'AUDIT :
-- VALIDATED = analyse correctement confirmée
-- CORRECT = analyse globalement correcte mais améliorable
-- PREMATURE = direction potentiellement correcte mais entrée trop tôt
-- INVALID = analyse incorrecte
-- UNCLEAR = capture insuffisante
+Définitions :
 
-Si l'analyse est incorrecte ou prématurée :
-propose une correction.
+VALIDATED :
+l'analyse est cohérente et l'entrée est valide.
 
-La correction doit inclure :
-- signal
-- entry
-- sl
-- tp1
-- tp2
-- tp3
-- rr
+CORRECT :
+l'idée est correcte mais certains détails doivent être améliorés.
 
-DÉTECTION AUTOMATIQUE :
-L'utilisateur n'a choisi aucun actif ni timeframe.
-Détecte-les depuis la capture.
-Si impossible : "UNKNOWN".
+PREMATURE :
+la direction est cohérente mais l'entrée est trop précoce.
+
+INVALID :
+l'analyse contredit clairement la structure du marché.
+
+UNCLEAR :
+la capture ne permet pas une conclusion fiable.
+
+Si l'analyse est incorrecte ou améliorable,
+propose une analyse corrigée.
+
+Ne force jamais un signal.
+
+Identifie automatiquement :
+- actif
+- timeframe
+
+Si impossible :
+UNKNOWN.
 
 Ne fabrique aucune actualité économique.
 
-Réponds uniquement avec le JSON attendu par le serveur.
+Réponds uniquement avec les données structurées
+attendues par l'application.
 `;
-}
-
-// ============================================================
-// DÉTECTION
-// ============================================================
-
-function updateDetection(data) {
-
-    const asset =
-        data.asset ||
-        data.detected_asset ||
-        data.instrument ||
-        "UNKNOWN";
-
-    const timeframe =
-        data.timeframe ||
-        data.detected_timeframe ||
-        "UNKNOWN";
-
-    if (detectedAsset) {
-        detectedAsset.textContent = formatDetectedValue(asset);
     }
 
-    if (detectedTimeframe) {
-        detectedTimeframe.textContent =
-            formatDetectedValue(timeframe);
+    /* =========================================================
+       DÉTECTION ACTIF / TIMEFRAME
+       ========================================================= */
+
+    function updateDetectedInfo(data) {
+
+        if (!detectedInfo) return;
+
+        detectedInfo.style.display = "block";
+
+        if (detectedAsset) {
+
+            detectedAsset.textContent =
+                data.asset &&
+                data.asset !== "UNKNOWN"
+                    ? data.asset
+                    : "Non identifié";
+        }
+
+        if (detectedTimeframe) {
+
+            detectedTimeframe.textContent =
+                data.timeframe &&
+                data.timeframe !== "UNKNOWN"
+                    ? data.timeframe
+                    : "Non identifié";
+        }
     }
 
-    if (detectedInfo) {
-        detectedInfo.style.display = "grid";
+    /* =========================================================
+       AFFICHAGE DES RÉSULTATS
+       ========================================================= */
+
+    function renderResults(data, mode) {
+
+        if (!resultsSection || !resultsContent) {
+            return;
+        }
+
+        resultsSection.style.display = "block";
+
+        if (mode === "audit") {
+
+            resultsContent.innerHTML =
+                renderAuditResults(data);
+
+        } else {
+
+            resultsContent.innerHTML =
+                renderScanResults(data);
+        }
+
+        attachCopyButton();
+
+        resultsSection.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+        });
     }
-}
 
-// ============================================================
-// AFFICHAGE SCAN
-// ============================================================
+    /* =========================================================
+       RÉSULTATS SCAN
+       ========================================================= */
 
-function renderScan(data) {
+    function renderScanResults(data) {
 
-    const signal = data.signal || "WAIT";
-    const direction = data.direction || "-";
+        const signal =
+            safe(data.signal, "WAIT");
 
-    const execution = data.execution || "-";
-    const confidence = data.confidence_percent ?? "-";
+        const direction =
+            safe(data.direction, "—");
 
-    const entry = data.entry ?? "-";
-    const sl = data.sl ?? "-";
-    const tp1 = data.tp1 ?? "-";
-    const tp2 = data.tp2 ?? "-";
-    const tp3 = data.tp3 ?? "-";
-    const rr = data.rr ?? "-";
+        const entry =
+            formatNumber(data.entry);
 
-    const score = data.arkas_score ?? "-";
+        const sl =
+            formatNumber(data.sl);
 
-    if (!resultsContent) {
-        return;
-    }
+        const tp1 =
+            formatNumber(data.tp1);
 
-    resultsContent.innerHTML = `
+        const tp2 =
+            formatNumber(data.tp2);
 
-        <div class="result-card">
+        const tp3 =
+            formatNumber(data.tp3);
 
-            <div class="signal-header">
+        const rr =
+            safe(data.rr, "—");
 
-                <div>
-                    <span class="result-label">SIGNAL ARKAS</span>
+        const confidence =
+            safe(data.confidence_percent, "—");
 
-                    <h2 class="${getSignalClass(signal)}">
-                        ${escapeHtml(signal)}
-                    </h2>
+        const score =
+            safe(data.arkas_score, "—");
 
-                    <p>
-                        Direction :
-                        <strong>${escapeHtml(direction)}</strong>
-                    </p>
+        const structure =
+            safe(data.structure, "—");
 
+        const reason =
+            safe(data.reason, "—");
+
+        const invalidation =
+            safe(data.invalidation, "—");
+
+        const scenario =
+            safe(data.primary_scenario, "—");
+
+        const alternative =
+            safe(data.alternative_scenario, "—");
+
+        const risk =
+            safe(data.risk_management, "—");
+
+        const news =
+            safe(data.economic_news, "Non vérifiées");
+
+        const signalClass =
+            getSignalClass(signal);
+
+        return `
+            <div class="result-main ${signalClass}">
+
+                <div class="result-signal">
+                    ${escapeHtml(signal)}
                 </div>
 
-                <div class="confidence-box">
-                    <span>Confiance</span>
-                    <strong>${escapeHtml(confidence)}%</strong>
+                <div class="result-meta">
+                    Direction :
+                    <strong>
+                        ${escapeHtml(direction)}
+                    </strong>
                 </div>
 
             </div>
 
-            <div class="metrics-grid">
+            <div class="result-grid">
 
-                ${metric("Actif", data.asset || "UNKNOWN")}
+                ${resultCard(
+                    "🎯 Entry",
+                    entry
+                )}
 
-                ${metric("Timeframe", data.timeframe || "UNKNOWN")}
+                ${resultCard(
+                    "🛑 Stop Loss",
+                    sl
+                )}
 
-                ${metric("Exécution", execution)}
+                ${resultCard(
+                    "💰 TP1",
+                    tp1
+                )}
 
-                ${metric("ARKAS Score", score)}
+                ${resultCard(
+                    "💰 TP2",
+                    tp2
+                )}
 
-            </div>
+                ${resultCard(
+                    "💰 TP3",
+                    tp3
+                )}
 
-            <div class="trade-plan">
+                ${resultCard(
+                    "📊 Risk / Reward",
+                    rr
+                )}
 
-                <h3>🎯 PLAN DE TRADE</h3>
+                ${resultCard(
+                    "🎯 Confiance",
+                    confidence + "%"
+                )}
 
-                ${tradeRow("Entry", entry)}
-
-                ${tradeRow("Stop Loss", sl)}
-
-                ${tradeRow("TP1", tp1)}
-
-                ${tradeRow("TP2", tp2)}
-
-                ${tradeRow("TP3", tp3)}
-
-                ${tradeRow("Risk / Reward", rr)}
+                ${resultCard(
+                    "⭐ ARKAS Score",
+                    score
+                )}
 
             </div>
 
             <div class="analysis-details">
 
                 ${detailBlock(
-                    "📐 Structure",
-                    data.structure
+                    "📈 Structure",
+                    structure
                 )}
 
                 ${detailBlock(
-                    "💧 Liquidité",
-                    data.liquidity
+                    "🧠 Pourquoi ?",
+                    reason
                 )}
 
                 ${detailBlock(
-                    "🧱 Order Block",
-                    data.order_block
-                )}
-
-                ${detailBlock(
-                    "📦 FVG",
-                    data.fvg
-                )}
-
-                ${detailBlock(
-                    "📈 Price Action",
-                    data.price_action
-                )}
-
-                ${detailBlock(
-                    "🧠 Scénario principal",
-                    data.primary_scenario
+                    "🎯 Scénario principal",
+                    scenario
                 )}
 
                 ${detailBlock(
                     "🔄 Scénario alternatif",
-                    data.alternative_scenario
+                    alternative
                 )}
 
                 ${detailBlock(
-                    "🚨 Invalidation",
-                    data.invalidation
+                    "⚠️ Invalidation",
+                    invalidation
+                )}
+
+                ${detailBlock(
+                    "🛡️ Risk Management",
+                    risk
+                )}
+
+                ${detailBlock(
+                    "📰 Economic News",
+                    news
                 )}
 
             </div>
 
-            <div class="reason-box">
+            <div class="copy-signal-area">
 
-                <h3>🧠 Pourquoi ?</h3>
-
-                <p>
-                    ${escapeHtml(
-                        data.reason ||
-                        "Aucune explication fournie."
-                    )}
-                </p>
+                <button
+                    type="button"
+                    id="copy-signal-btn"
+                    class="copy-signal-btn"
+                >
+                    📋 Copier le signal
+                </button>
 
             </div>
-
-            <button
-                type="button"
-                class="copy-signal-btn"
-                id="copySignalBtn">
-                📋 COPIER LE SIGNAL
-            </button>
-
-        </div>
-    `;
-
-    const copyBtn = document.getElementById("copySignalBtn");
-
-    if (copyBtn) {
-        copyBtn.addEventListener("click", () => {
-            copySignal(data);
-        });
-    }
-}
-
-// ============================================================
-// AFFICHAGE AUDIT
-// ============================================================
-
-function renderAudit(data) {
-
-    const audit = data.audit || {};
-
-    const status = audit.status || "UNCLEAR";
-
-    const detected =
-        audit.detected_user_analysis || {};
-
-    const corrected =
-        audit.corrected_trade || {};
-
-    if (!resultsContent) {
-        return;
+        `;
     }
 
-    resultsContent.innerHTML = `
+    /* =========================================================
+       RÉSULTATS AUDIT
+       ========================================================= */
 
-        <div class="result-card">
+    function renderAuditResults(data) {
 
-            <div class="audit-header">
+        const audit =
+            data.audit || {};
 
-                <span class="result-label">
-                    RÉSULTAT DE L'AUDIT
-                </span>
+        const status =
+            safe(
+                audit.status,
+                "UNCLEAR"
+            );
 
-                <h2 class="${getAuditClass(status)}">
-                    ${getAuditLabel(status)}
-                </h2>
+        const verdict =
+            safe(
+                audit.verdict,
+                "Audit non disponible."
+            );
 
-            </div>
+        const strengths =
+            safeList(
+                audit.strengths
+            );
 
-            <div class="audit-verdict">
+        const errors =
+            safeList(
+                audit.errors
+            );
 
-                <h3>🔎 Verdict</h3>
+        const corrections =
+            safeList(
+                audit.corrections
+            );
 
-                <p>
-                    ${escapeHtml(
-                        audit.verdict ||
-                        "Aucun verdict disponible."
-                    )}
-                </p>
+        const corrected =
+            audit.corrected_trade || {};
 
-            </div>
+        const statusInfo =
+            getAuditStatus(status);
 
-            <div class="metrics-grid">
+        return `
+            <div class="audit-verdict ${statusInfo.className}">
 
-                ${metric(
-                    "Actif détecté",
-                    data.asset || "UNKNOWN"
-                )}
+                <div class="audit-icon">
+                    ${statusInfo.icon}
+                </div>
 
-                ${metric(
-                    "Timeframe détecté",
-                    data.timeframe || "UNKNOWN"
-                )}
+                <div>
+                    <div class="audit-title">
+                        ${escapeHtml(
+                            statusInfo.title
+                        )}
+                    </div>
 
-                ${metric(
-                    "Direction détectée",
-                    detected.direction || "-"
-                )}
-
-                ${metric(
-                    "Entrée détectée",
-                    detected.entry ?? "-"
-                )}
+                    <div class="audit-description">
+                        ${escapeHtml(verdict)}
+                    </div>
+                </div>
 
             </div>
 
             <div class="audit-columns">
 
                 <div class="audit-box">
+                    <h3>✅ Points positifs</h3>
 
-                    <h3>✅ Points forts</h3>
-
-                    ${renderList(
-                        audit.strengths
-                    )}
-
+                    ${
+                        renderList(strengths)
+                    }
                 </div>
 
                 <div class="audit-box">
+                    <h3>⚠️ Points à corriger</h3>
 
-                    <h3>⚠️ Erreurs / corrections</h3>
-
-                    ${renderList(
-                        audit.errors
-                    )}
-
-                    ${renderList(
-                        audit.corrections
-                    )}
-
+                    ${
+                        renderList(errors)
+                    }
                 </div>
 
             </div>
 
-            <div class="trade-plan">
+            <div class="audit-box correction-box">
 
-                <h3>🎯 TRADE CORRIGÉ</h3>
+                <h3>
+                    🛠️ Corrections proposées
+                </h3>
 
-                ${tradeRow(
-                    "Signal",
-                    corrected.signal || "-"
-                )}
-
-                ${tradeRow(
-                    "Entry",
-                    corrected.entry ?? "-"
-                )}
-
-                ${tradeRow(
-                    "SL",
-                    corrected.sl ?? "-"
-                )}
-
-                ${tradeRow(
-                    "TP1",
-                    corrected.tp1 ?? "-"
-                )}
-
-                ${tradeRow(
-                    "TP2",
-                    corrected.tp2 ?? "-"
-                )}
-
-                ${tradeRow(
-                    "TP3",
-                    corrected.tp3 ?? "-"
-                )}
-
-                ${tradeRow(
-                    "RR",
-                    corrected.rr ?? "-"
-                )}
+                ${
+                    renderList(corrections)
+                }
 
             </div>
 
-            <button
-                type="button"
-                class="copy-signal-btn"
-                id="copyAuditSignalBtn">
-                📋 COPIER LE SIGNAL CORRIGÉ
-            </button>
+            <div class="corrected-trade">
 
-        </div>
-    `;
+                <h3>
+                    🎯 Analyse corrigée
+                </h3>
 
-    const copyBtn =
-        document.getElementById(
-            "copyAuditSignalBtn"
-        );
+                <div class="result-grid">
 
-    if (copyBtn) {
+                    ${resultCard(
+                        "Signal",
+                        safe(
+                            corrected.signal,
+                            "WAIT"
+                        )
+                    )}
 
-        copyBtn.addEventListener("click", () => {
+                    ${resultCard(
+                        "Entry",
+                        formatNumber(
+                            corrected.entry
+                        )
+                    )}
 
-            copySignal({
-                signal: corrected.signal,
-                direction: corrected.signal,
-                asset: data.asset,
-                timeframe: data.timeframe,
-                entry: corrected.entry,
-                sl: corrected.sl,
-                tp1: corrected.tp1,
-                tp2: corrected.tp2,
-                tp3: corrected.tp3,
-                rr: corrected.rr
-            });
+                    ${resultCard(
+                        "SL",
+                        formatNumber(
+                            corrected.sl
+                        )
+                    )}
 
-        });
-    }
-}
+                    ${resultCard(
+                        "TP1",
+                        formatNumber(
+                            corrected.tp1
+                        )
+                    )}
 
-// ============================================================
-// HELPERS AFFICHAGE
-// ============================================================
+                    ${resultCard(
+                        "TP2",
+                        formatNumber(
+                            corrected.tp2
+                        )
+                    )}
 
-function metric(label, value) {
+                    ${resultCard(
+                        "TP3",
+                        formatNumber(
+                            corrected.tp3
+                        )
+                    )}
 
-    return `
-        <div class="metric-card">
-            <span>${escapeHtml(label)}</span>
-            <strong>${escapeHtml(value ?? "-")}</strong>
-        </div>
-    `;
-}
+                    ${resultCard(
+                        "RR",
+                        safe(
+                            corrected.rr,
+                            "—"
+                        )
+                    )}
 
-function tradeRow(label, value) {
+                </div>
 
-    return `
-        <div class="trade-row">
-            <span>${escapeHtml(label)}</span>
-            <strong>${escapeHtml(value ?? "-")}</strong>
-        </div>
-    `;
-}
+                <div class="copy-signal-area">
 
-function detailBlock(title, value) {
+                    <button
+                        type="button"
+                        id="copy-signal-btn"
+                        class="copy-signal-btn"
+                    >
+                        📋 Copier le signal corrigé
+                    </button>
 
-    if (
-        value === undefined ||
-        value === null ||
-        value === "" ||
-        value === "-"
-    ) {
-        return "";
-    }
+                </div>
 
-    return `
-        <div class="detail-block">
-
-            <h4>${escapeHtml(title)}</h4>
-
-            <p>
-                ${escapeHtml(
-                    typeof value === "object"
-                        ? JSON.stringify(value)
-                        : value
-                )}
-            </p>
-
-        </div>
-    `;
-}
-
-function renderList(items) {
-
-    if (!Array.isArray(items) || items.length === 0) {
-
-        return `
-            <p class="empty-list">
-                Aucun élément.
-            </p>
+            </div>
         `;
     }
 
-    return `
-        <ul>
-            ${items.map(item => `
-                <li>
-                    ${escapeHtml(
-                        typeof item === "object"
-                            ? JSON.stringify(item)
-                            : item
-                    )}
-                </li>
-            `).join("")}
-        </ul>
-    `;
-}
+    /* =========================================================
+       OUTILS AFFICHAGE
+       ========================================================= */
 
-// ============================================================
-// COPIER LE SIGNAL
-// ============================================================
+    function resultCard(title, value) {
 
-async function copySignal(data) {
+        return `
+            <div class="result-card">
+                <span class="result-card-title">
+                    ${escapeHtml(title)}
+                </span>
 
-    const text = `
-ARKAS SCAN AI
+                <strong class="result-card-value">
+                    ${escapeHtml(String(value))}
+                </strong>
+            </div>
+        `;
+    }
 
-Actif : ${data.asset || "UNKNOWN"}
-Timeframe : ${data.timeframe || "UNKNOWN"}
+    function detailBlock(title, value) {
 
-Signal : ${data.signal || "-"}
-Direction : ${data.direction || "-"}
+        return `
+            <div class="detail-block">
+                <h3>
+                    ${escapeHtml(title)}
+                </h3>
 
-Entry : ${data.entry ?? "-"}
-SL : ${data.sl ?? "-"}
-TP1 : ${data.tp1 ?? "-"}
-TP2 : ${data.tp2 ?? "-"}
-TP3 : ${data.tp3 ?? "-"}
+                <p>
+                    ${escapeHtml(String(value))}
+                </p>
+            </div>
+        `;
+    }
 
-RR : ${data.rr ?? "-"}
-ARKAS Score : ${data.arkas_score ?? "-"}
+    function renderList(items) {
 
-⚠️ Gestion du risque : toujours confirmer le signal avant de prendre une position.
-`.trim();
+        if (!items.length) {
+            return `
+                <p class="empty-list">
+                    Aucun élément.
+                </p>
+            `;
+        }
 
-    try {
+        return `
+            <ul>
+                ${items.map(item => `
+                    <li>
+                        ${escapeHtml(String(item))}
+                    </li>
+                `).join("")}
+            </ul>
+        `;
+    }
 
-        await navigator.clipboard.writeText(text);
+    function safe(value, fallback = "—") {
 
-        showStatus(
-            "📋 Signal copié.",
-            "success"
+        if (
+            value === null ||
+            value === undefined ||
+            value === ""
+        ) {
+            return fallback;
+        }
+
+        return value;
+    }
+
+    function safeList(value) {
+
+        if (Array.isArray(value)) {
+            return value.filter(Boolean);
+        }
+
+        if (
+            typeof value === "string" &&
+            value.trim()
+        ) {
+            return [value];
+        }
+
+        return [];
+    }
+
+    function formatNumber(value) {
+
+        if (
+            value === null ||
+            value === undefined ||
+            value === ""
+        ) {
+            return "—";
+        }
+
+        return String(value);
+    }
+
+    function getSignalClass(signal) {
+
+        const s =
+            String(signal)
+                .toUpperCase();
+
+        if (s.includes("BUY")) {
+            return "signal-buy";
+        }
+
+        if (s.includes("SELL")) {
+            return "signal-sell";
+        }
+
+        return "signal-wait";
+    }
+
+    function getAuditStatus(status) {
+
+        switch (
+            String(status).toUpperCase()
+        ) {
+
+            case "VALIDATED":
+                return {
+                    icon: "✅",
+                    title: "ANALYSE VALIDÉE",
+                    className:
+                        "audit-valid"
+                };
+
+            case "CORRECT":
+                return {
+                    icon: "⚠️",
+                    title:
+                        "ANALYSE À CORRIGER",
+                    className:
+                        "audit-correct"
+                };
+
+            case "PREMATURE":
+                return {
+                    icon: "🟡",
+                    title:
+                        "ANALYSE CORRECTE MAIS ENTRÉE PRÉMATURÉE",
+                    className:
+                        "audit-premature"
+                };
+
+            case "INVALID":
+                return {
+                    icon: "❌",
+                    title:
+                        "ANALYSE INVALIDÉE",
+                    className:
+                        "audit-invalid"
+                };
+
+            default:
+                return {
+                    icon: "❓",
+                    title:
+                        "ANALYSE NON DÉTERMINÉE",
+                    className:
+                        "audit-unclear"
+                };
+        }
+    }
+
+    /* =========================================================
+       COPIER LE SIGNAL
+       ========================================================= */
+
+    function attachCopyButton() {
+
+        const copyBtn =
+            document.getElementById(
+                "copy-signal-btn"
+            );
+
+        if (!copyBtn) return;
+
+        copyBtn.addEventListener(
+            "click",
+            async () => {
+
+                const text =
+                    createCopyText();
+
+                try {
+
+                    await navigator.clipboard.writeText(
+                        text
+                    );
+
+                    copyBtn.textContent =
+                        "✅ Signal copié !";
+
+                    setTimeout(() => {
+
+                        copyBtn.textContent =
+                            "📋 Copier le signal";
+
+                    }, 2000);
+
+                } catch (error) {
+
+                    console.error(
+                        "Copy error:",
+                        error
+                    );
+
+                    copyBtn.textContent =
+                        "❌ Copie impossible";
+                }
+            }
         );
-
-    } catch (error) {
-
-        console.error(error);
-
-        showStatus(
-            "❌ Impossible de copier automatiquement.",
-            "error"
-        );
-    }
-}
-
-// ============================================================
-// BOUTONS LOADING
-// ============================================================
-
-function setButtonsLoading(loading) {
-
-    if (analyzeBtn) {
-
-        analyzeBtn.disabled = loading;
-
-        analyzeBtn.textContent =
-            loading
-                ? "⏳ ANALYSE..."
-                : "🔍 SCANNER LA CAPTURE";
     }
 
-    if (auditBtn) {
+    function createCopyText() {
 
-        auditBtn.disabled = loading;
+        if (!resultsContent) {
+            return "";
+        }
 
-        auditBtn.textContent =
-            loading
-                ? "⏳ VÉRIFICATION..."
-                : "🧪 VÉRIFIER MON ANALYSE";
-    }
-}
-
-// ============================================================
-// STATUS
-// ============================================================
-
-function showStatus(message, type = "") {
-
-    if (!analysisStatus) {
-        return;
+        return resultsContent.innerText.trim();
     }
 
-    analysisStatus.textContent = message;
+    /* =========================================================
+       BOUTONS
+       ========================================================= */
 
-    analysisStatus.className =
-        "analysis-status " + type;
-}
+    function setButtonsDisabled(disabled) {
 
-// ============================================================
-// RESET
-// ============================================================
+        if (analyzeBtn) {
+            analyzeBtn.disabled = disabled;
+        }
 
-function resetImage() {
+        if (auditBtn) {
+            auditBtn.disabled = disabled;
+        }
 
-    selectedFile = null;
-    selectedBase64 = null;
-    selectedMimeType = null;
+        if (importBtn) {
+            importBtn.disabled = disabled;
+        }
 
-    if (fileInput) {
-        fileInput.value = "";
+        if (dropZone) {
+            dropZone.classList.toggle(
+                "scanner-disabled",
+                disabled
+            );
+        }
     }
 
-    if (imagePreview) {
-        imagePreview.removeAttribute("src");
+    /* =========================================================
+       STATUS
+       ========================================================= */
+
+    function showStatus(message, type = "info") {
+
+        if (!analysisStatus) return;
+
+        analysisStatus.textContent =
+            message;
+
+        analysisStatus.className =
+            "analysis-status status-" +
+            type;
     }
 
-    if (previewContainer) {
-        previewContainer.style.display = "none";
+    /* =========================================================
+       ESCAPE HTML
+       ========================================================= */
+
+    function escapeHtml(value) {
+
+        return String(value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
     }
 
-    if (detectedInfo) {
-        detectedInfo.style.display = "none";
-    }
-
-    if (scannerActions) {
-        scannerActions.style.display = "none";
-    }
-}
-
-// ============================================================
-// SIGNAL CLASS
-// ============================================================
-
-function getSignalClass(signal) {
-
-    const value =
-        String(signal || "").toUpperCase();
-
-    if (
-        value.includes("BUY")
-    ) {
-        return "signal-buy";
-    }
-
-    if (
-        value.includes("SELL")
-    ) {
-        return "signal-sell";
-    }
-
-    return "signal-wait";
-}
-
-function getAuditClass(status) {
-
-    switch (
-        String(status || "").toUpperCase()
-    ) {
-
-        case "VALIDATED":
-            return "audit-valid";
-
-        case "CORRECT":
-            return "audit-correct";
-
-        case "PREMATURE":
-            return "audit-premature";
-
-        case "INVALID":
-            return "audit-invalid";
-
-        default:
-            return "audit-unclear";
-    }
-}
-
-function getAuditLabel(status) {
-
-    switch (
-        String(status || "").toUpperCase()
-    ) {
-
-        case "VALIDATED":
-            return "✅ ANALYSE VALIDÉE";
-
-        case "CORRECT":
-            return "⚠️ ANALYSE À CORRIGER";
-
-        case "PREMATURE":
-            return "🟡 ENTRÉE PRÉMATURÉE";
-
-        case "INVALID":
-            return "❌ ANALYSE INVALIDÉE";
-
-        default:
-            return "❔ ANALYSE INCERTAINE";
-    }
-}
-
-// ============================================================
-// FORMAT
-// ============================================================
-
-function formatDetectedValue(value) {
-
-    if (
-        value === undefined ||
-        value === null ||
-        value === ""
-    ) {
-        return "UNKNOWN";
-    }
-
-    return String(value);
-}
-
-// ============================================================
-// SÉCURITÉ HTML
-// ============================================================
-
-function escapeHtml(value) {
-
-    if (
-        value === undefined ||
-        value === null
-    ) {
-        return "";
-    }
-
-    return String(value)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
+});

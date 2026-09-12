@@ -1,7 +1,7 @@
 // ============================================================
 // ARKAS SCAN AI V2
 // api/analyze.js
-// Gemini Vision — Stratégie adaptative par marché
+// Gemini 3.6 Flash Vision — Stratégie adaptative par marché
 // SMC (Or) / SMC+PA (Forex) / PA simplifiée (Indices+Crypto)
 // ============================================================
 
@@ -117,13 +117,17 @@ export default async function handler(req, res) {
         }
 
         /* ====================================================
-           GEMINI
+           GEMINI 3.6 FLASH — CORRECTION DU MODÈLE ET PARAMÈTRES
            ==================================================== */
-        const model = "gemini-3.6-flash-tiered";
+
+        // ✅ Modèle officiel Gemini 3.6 Flash (GA depuis le 21 juillet 2026)
+        const model = "gemini-3.6-flash";
 
         const endpoint =
             `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
+        // ⚠️ IMPORTANT : temperature, top_p et top_k sont DÉPRÉCIÉS
+        // pour Gemini 3.x. Ne pas les inclure dans generationConfig.
         const geminiResponse = await fetch(endpoint, {
             method: "POST",
 
@@ -149,8 +153,8 @@ export default async function handler(req, res) {
                 ],
 
                 generationConfig: {
-                    temperature: 0.15,
                     responseMimeType: "application/json"
+                    // ❌ NE PAS AJOUTER temperature/top_p/top_k
                 }
             })
         });
@@ -650,7 +654,7 @@ ${userPrompt}
 
 
 /* ============================================================
-   PROMPT AUDIT (conservé — sert au mode VÉRIFIER MON ANALYSE)
+   PROMPT AUDIT (mode VÉRIFIER MON ANALYSE)
    ============================================================ */
 
 function buildAuditPrompt(asset, timeframe, userPrompt) {

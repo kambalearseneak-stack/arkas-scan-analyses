@@ -1,41 +1,53 @@
 /* =========================================================
-   ARKAS SCAN AI V2
-   PREMIUM GLASS TRADING UI
-   Bleu électrique + Violet
+   ARKAS SCAN AI V2 - MULTI-NEON GLASS TRADING UI
+   Fusion : Bleu + Violet + Vert + Rouge + Jaune
    ========================================================= */
 
 :root {
-    --bg: #050914;
-    --bg-2: #080d1b;
+    /* Couleurs de fond de base */
+    --bg: #030712;
+    --bg-2: #070d1d;
 
-    --glass: rgba(12, 20, 38, 0.58);
-    --glass-strong: rgba(10, 17, 32, 0.78);
-    --glass-light: rgba(255, 255, 255, 0.055);
+    /* Composants Glassmorphism */
+    --glass: rgba(10, 16, 31, 0.65);
+    --glass-strong: rgba(6, 11, 24, 0.85);
+    --glass-light: rgba(255, 255, 255, 0.05);
 
-    --border: rgba(255, 255, 255, 0.10);
-    --border-blue: rgba(56, 189, 248, 0.28);
+    /* Bordures subtiles & lumineuses */
+    --border: rgba(255, 255, 255, 0.08);
+    --border-glow: rgba(56, 189, 248, 0.25);
 
+    /* Palette Trading & Signal */
     --blue: #38bdf8;
     --blue-2: #0ea5e9;
-    --violet: #8b5cf6;
+    --violet: #a855f7;
     --violet-2: #7c3aed;
-
-    --text: #f4f7fb;
-    --text-soft: #a8b3c7;
-    --text-muted: #718096;
-
-    --green: #22c55e;
-    --red: #ef4444;
+    --green: #10b981;
+    --green-2: #059669;
+    --red: #f43f5e;
+    --red-2: #e11d48;
     --yellow: #f59e0b;
+    --yellow-2: #d97706;
 
-    --shadow:
-        0 20px 60px rgba(0, 0, 0, 0.38);
+    /* Dégradés Combinés Multi-Couleurs */
+    --grad-trading: linear-gradient(135deg, #10b981, #38bdf8, #a855f7, #f43f5e);
+    --grad-glow: linear-gradient(90deg, #10b981 0%, #38bdf8 33%, #a855f7 66%, #f43f5e 100%);
+    --grad-accent: linear-gradient(135deg, #0ea5e9, #8b5cf6);
+
+    /* Typographie */
+    --text: #f8fafc;
+    --text-soft: #94a3b8;
+    --text-muted: #64748b;
+
+    /* Ombres Profondes */
+    --shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+    --shadow-neon: 0 0 30px rgba(56, 189, 248, 0.15);
 
     --radius: 20px;
 }
 
 /* =========================================================
-   RESET
+   RESET & BASE
    ========================================================= */
 
 * {
@@ -50,78 +62,32 @@ html {
 
 body {
     min-height: 100vh;
-    font-family:
-        Inter,
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        Roboto,
-        Arial,
-        sans-serif;
-
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     color: var(--text);
-
+    
+    /* Arrière-plan multi-lumières trading (Rouge, Vert, Bleu, Violet) */
     background:
-        radial-gradient(
-            circle at 15% 10%,
-            rgba(56, 189, 248, 0.12),
-            transparent 28%
-        ),
-        radial-gradient(
-            circle at 85% 20%,
-            rgba(139, 92, 246, 0.13),
-            transparent 30%
-        ),
-        linear-gradient(
-            135deg,
-            #040711 0%,
-            #07101f 50%,
-            #050914 100%
-        );
+        radial-gradient(circle at 10% 15%, rgba(16, 185, 129, 0.12), transparent 30%),
+        radial-gradient(circle at 85% 20%, rgba(244, 63, 94, 0.12), transparent 32%),
+        radial-gradient(circle at 50% 60%, rgba(138, 85, 247, 0.10), transparent 40%),
+        radial-gradient(circle at 20% 85%, rgba(245, 158, 11, 0.08), transparent 30%),
+        linear-gradient(135deg, #02050e 0%, #070e1e 50%, #040814 100%);
 
+    background-attachment: fixed;
     overflow-x: hidden;
 }
-
-/* =========================================================
-   BACKGROUND LIGHT
-   ========================================================= */
 
 body::before {
     content: "";
     position: fixed;
     inset: 0;
     pointer-events: none;
-
-    background:
-        radial-gradient(
-            circle at 50% 0%,
-            rgba(56, 189, 248, 0.05),
-            transparent 35%
-        );
-
+    background: radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.08), transparent 45%);
     z-index: -1;
 }
 
 /* =========================================================
-   GLOBAL
-   ========================================================= */
-
-button,
-input {
-    font: inherit;
-}
-
-button {
-    cursor: pointer;
-}
-
-a {
-    color: inherit;
-    text-decoration: none;
-}
-
-/* =========================================================
-   GLASS SYSTEM
+   SYSTÈME GLASSMORPHISM MULTICOLORE
    ========================================================= */
 
 .scanner-card,
@@ -133,53 +99,52 @@ a {
 .correction-box,
 .detected-info,
 .status-info {
-
-    background:
-        linear-gradient(
-            135deg,
-            rgba(255, 255, 255, 0.065),
-            rgba(255, 255, 255, 0.025)
-        );
-
+    position: relative;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
     background-color: var(--glass);
-
     border: 1px solid var(--border);
-
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
-
     box-shadow: var(--shadow);
-
     border-radius: var(--radius);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+/* Ligne supérieure néon multi-couleur au survol des cartes */
+.scanner-card::after,
+.results-card::after,
+.method-card::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--grad-glow);
+    opacity: 0.4;
+    border-radius: var(--radius) var(--radius) 0 0;
 }
 
 /* =========================================================
-   HEADER
+   HEADER & BRANDING
    ========================================================= */
 
 header {
     width: 100%;
     position: relative;
     z-index: 20;
-
-    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-
-    background:
-        rgba(4, 8, 18, 0.72);
-
-    backdrop-filter: blur(22px);
-    -webkit-backdrop-filter: blur(22px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(3, 7, 18, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
 }
 
 header > *,
 .header-inner {
     max-width: 1180px;
     margin: auto;
+    padding: 16px 20px;
 }
-
-/* =========================================================
-   BRAND
-   ========================================================= */
 
 .brand {
     display: flex;
@@ -188,50 +153,34 @@ header > *,
 }
 
 .brand-mark {
-    width: 43px;
-    height: 43px;
-
+    width: 44px;
+    height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
-
     border-radius: 13px;
-
     font-weight: 900;
-    font-size: 15px;
-    letter-spacing: -0.5px;
-
-    color: white;
-
-    background:
-        linear-gradient(
-            135deg,
-            var(--blue),
-            var(--violet)
-        );
-
-    box-shadow:
-        0 0 25px rgba(56, 189, 248, 0.25),
-        0 0 35px rgba(139, 92, 246, 0.18);
-}
-
-.brand-text {
-    display: flex;
-    align-items: baseline;
-    gap: 5px;
+    font-size: 16px;
+    color: #fff;
+    background: var(--grad-trading);
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.3), 0 0 20px rgba(244, 63, 94, 0.3);
 }
 
 .brand-name {
-    font-size: 19px;
+    font-size: 20px;
     font-weight: 850;
     letter-spacing: 0.5px;
+    background: linear-gradient(90deg, #ffffff, #a8b3c7);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
 }
 
 .brand-ai {
     font-size: 13px;
     font-weight: 800;
-
     color: var(--blue);
+    margin-left: 4px;
 }
 
 /* =========================================================
@@ -241,25 +190,15 @@ header > *,
 .hero {
     max-width: 1180px;
     margin: 0 auto;
-
     padding: 40px 20px 24px;
 }
 
 .hero h1 {
-    font-size: clamp(27px, 5vw, 43px);
-    line-height: 1.08;
-    letter-spacing: -1.5px;
-
+    font-size: clamp(28px, 5vw, 44px);
+    line-height: 1.1;
+    letter-spacing: -1px;
     margin-bottom: 12px;
-
-    background:
-        linear-gradient(
-            90deg,
-            #ffffff,
-            #bfeaff 45%,
-            #c7b8ff
-        );
-
+    background: linear-gradient(90deg, #10b981, #38bdf8 35%, #a855f7 70%, #f43f5e);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -267,1177 +206,234 @@ header > *,
 
 .hero p {
     max-width: 680px;
-
     color: var(--text-soft);
     font-size: 15px;
     line-height: 1.65;
 }
 
 /* =========================================================
-   MAIN
-   ========================================================= */
-
-main {
-    width: 100%;
-}
-
-main > section,
-main > div {
-    max-width: 1180px;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-/* =========================================================
-   SCANNER CARD
-   ========================================================= */
-
-.scanner-card {
-    margin: 18px auto;
-    padding: 20px;
-
-    position: relative;
-    overflow: hidden;
-}
-
-.scanner-card::before {
-    content: "";
-
-    position: absolute;
-    width: 250px;
-    height: 250px;
-
-    top: -140px;
-    right: -80px;
-
-    background: rgba(56, 189, 248, 0.08);
-
-    filter: blur(50px);
-    border-radius: 50%;
-
-    pointer-events: none;
-}
-
-/* =========================================================
-   DROP ZONE
+   DROP ZONE (Scanner)
    ========================================================= */
 
 #dropZone {
-    min-height: 190px;
-
+    min-height: 200px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-
     text-align: center;
-
     padding: 30px 20px;
-
-    border: 1px dashed rgba(56, 189, 248, 0.35);
+    border: 1px dashed rgba(56, 189, 248, 0.3);
     border-radius: 17px;
-
-    background:
-        rgba(56, 189, 248, 0.025);
-
-    transition:
-        0.25s ease;
-
+    background: rgba(10, 20, 40, 0.3);
+    transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
-}
-
-#dropZone::before {
-    content: "";
-
-    position: absolute;
-    inset: 0;
-
-    background:
-        linear-gradient(
-            120deg,
-            transparent,
-            rgba(56, 189, 248, 0.04),
-            transparent
-        );
-
-    transform: translateX(-100%);
-    transition: transform 0.8s ease;
-}
-
-#dropZone:hover::before {
-    transform: translateX(100%);
 }
 
 #dropZone:hover,
 #dropZone.drag-over {
     border-color: var(--blue);
-
-    background:
-        rgba(56, 189, 248, 0.07);
-
-    box-shadow:
-        0 0 35px rgba(56, 189, 248, 0.08);
+    background: rgba(56, 189, 248, 0.06);
+    box-shadow: inset 0 0 25px rgba(56, 189, 248, 0.1), 0 0 30px rgba(168, 85, 247, 0.15);
 }
-
-#dropZone h3 {
-    margin-top: 12px;
-    font-size: 17px;
-}
-
-#dropZone p {
-    color: var(--text-muted);
-    font-size: 13px;
-    margin-top: 6px;
-}
-
-/* =========================================================
-   IMPORT BUTTON
-   ========================================================= */
 
 #import-btn {
     margin-top: 18px;
-
-    border: 1px solid rgba(56, 189, 248, 0.3);
-
+    border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 12px;
-
-    padding: 11px 18px;
-
-    color: white;
-
-    background:
-        rgba(56, 189, 248, 0.09);
-
-    transition: 0.25s ease;
+    padding: 11px 22px;
+    color: var(--text);
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(168, 85, 247, 0.15));
+    transition: all 0.25s ease;
+    font-weight: 600;
 }
 
 #import-btn:hover {
-    background:
-        rgba(56, 189, 248, 0.16);
-
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(168, 85, 247, 0.25));
     border-color: var(--blue);
-
-    transform: translateY(-1px);
+    box-shadow: 0 0 15px rgba(56, 189, 248, 0.25);
+    transform: translateY(-2px);
 }
 
 /* =========================================================
-   PREVIEW
-   ========================================================= */
-
-#preview-container {
-    margin-top: 18px;
-}
-
-.scan-image-wrapper {
-    position: relative;
-
-    width: 100%;
-
-    border-radius: 17px;
-
-    overflow: hidden;
-
-    background: #02050c;
-
-    border: 1px solid rgba(255, 255, 255, 0.09);
-
-    box-shadow:
-        0 15px 45px rgba(0, 0, 0, 0.35);
-}
-
-#image-preview {
-    display: block;
-
-    width: 100%;
-    height: auto;
-
-    max-height: 600px;
-
-    object-fit: contain;
-
-    background: #02050c;
-}
-
-/* =========================================================
-   FILE NAME
-   ========================================================= */
-
-#file-name {
-    margin-top: 10px;
-
-    color: var(--text-muted);
-
-    font-size: 12px;
-}
-
-/* =========================================================
-   DETECTED INFO
-   ========================================================= */
-
-#detected-info {
-    margin-top: 15px;
-
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-
-    padding: 13px;
-
-    background:
-        rgba(255, 255, 255, 0.035);
-
-    border-radius: 14px;
-
-    border: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-#detected-info strong {
-    color: var(--blue);
-}
-
-/* =========================================================
-   SCANNER ACTIONS
+   SCANNER ACTIONS & BUTTONS
    ========================================================= */
 
 #scanner-actions {
     display: grid;
-
     grid-template-columns: 1fr 1fr;
-
-    gap: 11px;
-
-    margin-top: 16px;
+    gap: 12px;
+    margin-top: 18px;
 }
 
 #scanner-actions button {
-    min-height: 48px;
-
+    min-height: 50px;
     border-radius: 13px;
-
-    border: 1px solid rgba(255, 255, 255, 0.10);
-
+    border: none;
     color: white;
-
-    font-weight: 750;
-
-    transition:
-        transform 0.2s ease,
-        box-shadow 0.2s ease,
-        background 0.2s ease;
-}
-
-#scanner-actions button:hover {
-    transform: translateY(-2px);
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    transition: all 0.25s ease;
 }
 
 #analyze-btn {
-    background:
-        linear-gradient(
-            135deg,
-            var(--blue-2),
-            var(--violet)
-        );
-
-    border-color: rgba(56, 189, 248, 0.4) !important;
-
-    box-shadow:
-        0 8px 25px rgba(14, 165, 233, 0.18);
+    background: linear-gradient(135deg, var(--green-2), var(--blue-2));
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.25);
 }
 
 #analyze-btn:hover {
-    box-shadow:
-        0 12px 32px rgba(56, 189, 248, 0.25);
+    background: linear-gradient(135deg, var(--green), var(--blue));
+    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+    transform: translateY(-2px);
 }
 
 #auditBtn {
-    background:
-        rgba(139, 92, 246, 0.10);
-
-    border-color:
-        rgba(139, 92, 246, 0.28) !important;
+    background: linear-gradient(135deg, var(--violet-2), var(--red-2));
+    box-shadow: 0 6px 20px rgba(244, 63, 94, 0.2);
 }
 
 #auditBtn:hover {
-    background:
-        rgba(139, 92, 246, 0.17);
+    background: linear-gradient(135deg, var(--violet), var(--red));
+    box-shadow: 0 8px 25px rgba(244, 63, 94, 0.35);
+    transform: translateY(-2px);
 }
 
 /* =========================================================
-   SCAN ANIMATION
+   ANIMATION SCAN MULTI-NEON
    ========================================================= */
-
-.scan-overlay {
-    position: absolute;
-    inset: 0;
-
-    pointer-events: none;
-
-    opacity: 0;
-    transition: opacity 0.3s ease;
-
-    background:
-        rgba(3, 8, 18, 0.12);
-
-    z-index: 5;
-}
-
-.scan-image-wrapper.is-scanning .scan-overlay {
-    opacity: 1;
-}
-
-.scan-grid {
-    position: absolute;
-    inset: 0;
-
-    opacity: 0.12;
-
-    background-image:
-        linear-gradient(
-            rgba(56, 189, 248, 0.20) 1px,
-            transparent 1px
-        ),
-        linear-gradient(
-            90deg,
-            rgba(56, 189, 248, 0.20) 1px,
-            transparent 1px
-        );
-
-    background-size: 35px 35px;
-}
 
 .scan-line {
     position: absolute;
-
-    left: 0;
-    right: 0;
-
-    top: 0;
-
-    height: 2px;
-
-    background:
-        linear-gradient(
-            90deg,
-            transparent,
-            var(--blue),
-            #ffffff,
-            var(--violet),
-            transparent
-        );
-
-    box-shadow:
-        0 0 14px rgba(56, 189, 248, 0.75);
-
-    animation:
-        scanMove 2.2s linear infinite;
-}
-
-@keyframes scanMove {
-    0% {
-        transform: translateY(0);
-    }
-
-    100% {
-        transform: translateY(100%);
-    }
-}
-
-/* =========================================================
-   SCAN CORNERS
-   ========================================================= */
-
-.scan-corners {
-    position: absolute;
-    inset: 18px;
-}
-
-.corner {
-    position: absolute;
-
-    width: 30px;
-    height: 30px;
-
-    border-color: var(--blue);
-    border-style: solid;
-
-    opacity: 0.9;
-}
-
-.top-left {
-    top: 0;
-    left: 0;
-
-    border-width: 2px 0 0 2px;
-}
-
-.top-right {
-    top: 0;
-    right: 0;
-
-    border-width: 2px 2px 0 0;
-}
-
-.bottom-left {
-    bottom: 0;
-    left: 0;
-
-    border-width: 0 0 2px 2px;
-}
-
-.bottom-right {
-    bottom: 0;
-    right: 0;
-
-    border-width: 0 2px 2px 0;
-}
-
-/* =========================================================
-   SCAN CENTER
-   ========================================================= */
-
-.scan-center {
-    position: absolute;
-
-    top: 50%;
-    left: 50%;
-
-    transform: translate(-50%, -50%);
-
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-
-    padding: 17px 22px;
-
-    border-radius: 15px;
-
-    background:
-        rgba(3, 8, 18, 0.68);
-
-    border:
-        1px solid rgba(56, 189, 248, 0.22);
-
-    backdrop-filter: blur(15px);
-    -webkit-backdrop-filter: blur(15px);
-
-    min-width: 190px;
-
-    box-shadow:
-        0 12px 35px rgba(0, 0, 0, 0.28);
+    left: 0; right: 0; top: 0;
+    height: 3px;
+    background: var(--grad-glow);
+    box-shadow: 0 0 18px rgba(56, 189, 248, 0.9), 0 0 10px rgba(16, 185, 129, 0.8);
+    animation: scanMove 2.2s linear infinite;
 }
 
 .scan-loader {
-    width: 28px;
-    height: 28px;
-
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
-
-    border:
-        2px solid rgba(255, 255, 255, 0.12);
-
-    border-top-color: var(--blue);
-    border-right-color: var(--violet);
-
-    animation:
-        scanSpin 0.8s linear infinite;
-}
-
-@keyframes scanSpin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-.scan-label {
-    margin-top: 10px;
-
-    font-size: 12px;
-    font-weight: 850;
-
-    letter-spacing: 0.8px;
-}
-
-.scan-subtitle {
-    margin-top: 4px;
-
-    font-size: 10px;
-
-    color: var(--text-muted);
-}
-
-.scan-status {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-
-    margin-top: 10px;
-
-    font-size: 10px;
-
-    color: var(--text-soft);
-}
-
-.scan-dot {
-    width: 7px;
-    height: 7px;
-
-    border-radius: 50%;
-
-    background: var(--blue);
-
-    box-shadow:
-        0 0 10px var(--blue);
-
-    animation:
-        pulse 1s infinite;
-}
-
-@keyframes pulse {
-    50% {
-        opacity: 0.35;
-    }
+    border: 3px solid transparent;
+    border-top-color: var(--green);
+    border-right-color: var(--blue);
+    border-bottom-color: var(--violet);
+    border-left-color: var(--red);
+    animation: scanSpin 0.8s linear infinite;
 }
 
 /* =========================================================
-   STATUS
-   ========================================================= */
-
-#analysis-status {
-    margin-top: 14px;
-}
-
-.status-info,
-.status-loading,
-.status-success,
-.status-error {
-    padding: 13px 15px;
-
-    border-radius: 12px;
-
-    font-size: 13px;
-
-    background:
-        rgba(255, 255, 255, 0.035);
-
-    border: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-.status-loading {
-    border-color:
-        rgba(56, 189, 248, 0.22);
-
-    color: var(--blue);
-}
-
-.status-success {
-    border-color:
-        rgba(34, 197, 94, 0.25);
-
-    color: #86efac;
-}
-
-.status-error {
-    border-color:
-        rgba(239, 68, 68, 0.25);
-
-    color: #fca5a5;
-}
-
-/* =========================================================
-   RESULTS
-   ========================================================= */
-
-#results-section {
-    margin-top: 20px;
-}
-
-.results-card {
-    padding: 20px;
-}
-
-/* =========================================================
-   MAIN RESULT
+   CARTE DES RÉSULTATS & SIGNATION TRADING
    ========================================================= */
 
 .result-main {
-    padding: 20px;
-
+    padding: 22px;
     border-radius: 17px;
-
-    background:
-        rgba(255, 255, 255, 0.035);
-
-    border:
-        1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: all 0.3s ease;
 }
 
+/* Signal ACHAT (Vert) */
 .result-main.signal-buy {
-    border-color:
-        rgba(34, 197, 94, 0.35);
-
-    background:
-        rgba(34, 197, 94, 0.055);
+    border-color: rgba(16, 185, 129, 0.4);
+    background: radial-gradient(circle at top left, rgba(16, 185, 129, 0.12), transparent 70%), rgba(10, 25, 20, 0.5);
+    box-shadow: 0 10px 30px rgba(16, 185, 129, 0.15);
 }
 
+/* Signal VENTE (Rouge) */
 .result-main.signal-sell {
-    border-color:
-        rgba(239, 68, 68, 0.35);
-
-    background:
-        rgba(239, 68, 68, 0.055);
+    border-color: rgba(244, 63, 94, 0.4);
+    background: radial-gradient(circle at top left, rgba(244, 63, 94, 0.12), transparent 70%), rgba(25, 10, 15, 0.5);
+    box-shadow: 0 10px 30px rgba(244, 63, 94, 0.15);
 }
 
+/* Signal ATTENTE (Jaune) */
 .result-main.signal-wait {
-    border-color:
-        rgba(245, 158, 11, 0.35);
-
-    background:
-        rgba(245, 158, 11, 0.055);
+    border-color: rgba(245, 158, 11, 0.4);
+    background: radial-gradient(circle at top left, rgba(245, 158, 11, 0.12), transparent 70%), rgba(25, 20, 10, 0.5);
+    box-shadow: 0 10px 30px rgba(245, 158, 11, 0.15);
 }
 
-.result-signal {
-    font-size: 26px;
-    font-weight: 900;
-    letter-spacing: -0.5px;
-}
-
-.signal-buy .result-signal {
-    color: var(--green);
-}
-
-.signal-sell .result-signal {
-    color: var(--red);
-}
-
-.signal-wait .result-signal {
-    color: var(--yellow);
-}
-
-.result-meta {
-    display: flex;
-    flex-wrap: wrap;
-
-    gap: 8px;
-
-    margin-top: 10px;
-
-    color: var(--text-soft);
-
-    font-size: 12px;
-}
+.signal-buy .result-signal { color: var(--green); text-shadow: 0 0 12px rgba(16, 185, 129, 0.4); }
+.signal-sell .result-signal { color: var(--red); text-shadow: 0 0 12px rgba(244, 63, 94, 0.4); }
+.signal-wait .result-signal { color: var(--yellow); text-shadow: 0 0 12px rgba(245, 158, 11, 0.4); }
 
 /* =========================================================
-   RESULT GRID
+   GRID DES CARTES DE DONNÉES
    ========================================================= */
 
 .result-grid {
     display: grid;
-
-    grid-template-columns:
-        repeat(3, minmax(0, 1fr));
-
-    gap: 10px;
-
-    margin-top: 13px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 15px;
 }
 
 .result-card {
-    padding: 15px;
-
+    padding: 16px;
     border-radius: 15px;
-
-    background:
-        rgba(255, 255, 255, 0.035);
-
-    box-shadow: none;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .result-card:hover {
-    border-color:
-        rgba(56, 189, 248, 0.20);
+    border-color: var(--blue-2);
+    box-shadow: 0 5px 20px rgba(14, 165, 233, 0.12);
+    transform: translateY(-2px);
 }
 
 .result-card-title {
-    font-size: 10px;
-
+    font-size: 11px;
     text-transform: uppercase;
-
-    letter-spacing: 0.7px;
-
+    letter-spacing: 0.8px;
     color: var(--text-muted);
 }
 
 .result-card-value {
     margin-top: 6px;
-
-    font-size: 18px;
-
+    font-size: 19px;
     font-weight: 800;
 }
 
 /* =========================================================
-   DETAILS
+   BOUTON COPY SIGNAL
    ========================================================= */
-
-.analysis-details {
-    margin-top: 16px;
-}
-
-.detail-block {
-    padding: 15px;
-
-    margin-bottom: 9px;
-
-    border-radius: 14px;
-
-    background:
-        rgba(255, 255, 255, 0.025);
-
-    border:
-        1px solid rgba(255, 255, 255, 0.065);
-}
-
-.detail-block h3 {
-    font-size: 13px;
-
-    color: var(--blue);
-
-    margin-bottom: 7px;
-}
-
-.detail-block p {
-    color: var(--text-soft);
-
-    font-size: 13px;
-
-    line-height: 1.6;
-}
-
-/* =========================================================
-   COPY SIGNAL
-   ========================================================= */
-
-.copy-signal-area {
-    margin-top: 15px;
-
-    display: flex;
-    justify-content: flex-end;
-}
 
 .copy-signal-btn {
-    border: 1px solid rgba(56, 189, 248, 0.28);
-
-    border-radius: 11px;
-
-    padding: 10px 15px;
-
+    border: none;
+    border-radius: 12px;
+    padding: 12px 20px;
     color: white;
-
-    background:
-        rgba(56, 189, 248, 0.08);
-
+    background: var(--grad-accent);
     font-weight: 700;
-
-    transition: 0.2s ease;
+    box-shadow: 0 4px 15px rgba(14, 165, 233, 0.25);
+    transition: all 0.25s ease;
 }
 
 .copy-signal-btn:hover {
-    background:
-        rgba(56, 189, 248, 0.16);
+    box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+    transform: translateY(-2px);
 }
 
 /* =========================================================
-   AUDIT
+   AUDIT VERDICTS (Couleurs contextuelles)
    ========================================================= */
 
-.audit-verdict {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-
-    padding: 18px;
-
-    border-radius: 17px;
-
-    margin-bottom: 14px;
-
-    background:
-        rgba(255, 255, 255, 0.035);
-
-    border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.audit-icon {
-    width: 45px;
-    height: 45px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    border-radius: 13px;
-
-    font-size: 22px;
-
-    background:
-        rgba(255, 255, 255, 0.06);
-}
-
-.audit-title {
-    font-size: 17px;
-    font-weight: 850;
-}
-
-.audit-description {
-    margin-top: 4px;
-
-    color: var(--text-soft);
-
-    font-size: 12px;
-
-    line-height: 1.5;
-}
-
 .audit-valid {
-    border-color:
-        rgba(34, 197, 94, 0.35);
-}
-
-.audit-correct {
-    border-color:
-        rgba(245, 158, 11, 0.35);
-}
-
-.audit-premature {
-    border-color:
-        rgba(245, 158, 11, 0.35);
+    border-color: rgba(16, 185, 129, 0.35);
+    background: radial-gradient(circle at left, rgba(16, 185, 129, 0.08), transparent 60%);
 }
 
 .audit-invalid {
-    border-color:
-        rgba(239, 68, 68, 0.35);
+    border-color: rgba(244, 63, 94, 0.35);
+    background: radial-gradient(circle at left, rgba(244, 63, 94, 0.08), transparent 60%);
 }
 
-.audit-unclear {
-    border-color:
-        rgba(56, 189, 248, 0.30);
-}
-
-/* =========================================================
-   AUDIT COLUMNS
-   ========================================================= */
-
-.audit-columns {
-    display: grid;
-
-    grid-template-columns:
-        repeat(2, minmax(0, 1fr));
-
-    gap: 11px;
-}
-
-.audit-box,
-.correction-box {
-    padding: 15px;
-
-    box-shadow: none;
-
-    background:
-        rgba(255, 255, 255, 0.03);
-}
-
-.audit-box h3,
-.correction-box h3 {
-    font-size: 12px;
-
-    color: var(--blue);
-
-    margin-bottom: 8px;
-}
-
-.audit-box p,
-.correction-box p {
-    color: var(--text-soft);
-
-    font-size: 13px;
-
-    line-height: 1.55;
-}
-
-.correction-box {
-    border-color:
-        rgba(56, 189, 248, 0.20);
-}
-
-/* =========================================================
-   CORRECTED TRADE
-   ========================================================= */
-
-.corrected-trade {
-    margin-top: 11px;
-
-    padding: 15px;
-
-    border-radius: 15px;
-
-    background:
-        linear-gradient(
-            135deg,
-            rgba(56, 189, 248, 0.06),
-            rgba(139, 92, 246, 0.06)
-        );
-
-    border:
-        1px solid rgba(56, 189, 248, 0.16);
-}
-
-/* =========================================================
-   METHOD
-   ========================================================= */
-
-.method-card {
-    margin-top: 18px;
-
-    padding: 20px;
-}
-
-.method-card h2 {
-    font-size: 18px;
-
-    margin-bottom: 15px;
-}
-
-.method-grid {
-    display: grid;
-
-    grid-template-columns:
-        repeat(3, 1fr);
-
-    gap: 9px;
-}
-
-.method-item {
-    padding: 13px;
-
-    border-radius: 13px;
-
-    background:
-        rgba(255, 255, 255, 0.035);
-
-    border:
-        1px solid rgba(255, 255, 255, 0.065);
-
-    color: var(--text-soft);
-
-    font-size: 12px;
-
-    text-align: center;
-}
-
-.method-item strong {
-    display: block;
-
-    color: var(--blue);
-
-    margin-bottom: 4px;
-}
-
-/* =========================================================
-   RISK
-   ========================================================= */
-
-.risk-card {
-    margin-top: 18px;
-
-    padding: 16px;
-
-    border-color:
-        rgba(245, 158, 11, 0.18);
-}
-
-.risk-card h3 {
-    color: var(--yellow);
-
-    font-size: 14px;
-
-    margin-bottom: 7px;
-}
-
-.risk-card p {
-    color: var(--text-soft);
-
-    font-size: 12px;
-
-    line-height: 1.6;
-}
-
-/* =========================================================
-   DISABLED
-   ========================================================= */
-
-.scanner-disabled {
-    opacity: 0.5;
-
-    pointer-events: none;
-}
-
-/* =========================================================
-   FOOTER
-   ========================================================= */
-
-footer {
-    max-width: 1180px;
-
-    margin: 30px auto 0;
-
-    padding: 25px 20px 35px;
-
-    text-align: center;
-
-    color: var(--text-muted);
-
-    font-size: 11px;
-
-    border-top:
-        1px solid rgba(255, 255, 255, 0.06);
-}
-
-/* =========================================================
-   SCROLLBAR
-   ========================================================= */
-
-::-webkit-scrollbar {
-    width: 7px;
-}
-
-::-webkit-scrollbar-track {
-    background: #050914;
-}
-
-::-webkit-scrollbar-thumb {
-    background:
-        linear-gradient(
-            var(--blue),
-            var(--violet)
-        );
-
-    border-radius: 20px;
-}
-
-/* =========================================================
-   MOBILE
-   ========================================================= */
-
-@media (max-width: 700px) {
-
-    .hero {
-        padding:
-            28px 14px 15px;
-    }
-
-    .hero h1 {
-        font-size: 28px;
-    }
-
-    .hero p {
-        font-size: 13px;
-    }
-
-    .scanner-card,
-    .results-card,
-    .method-card {
-        margin-left: 10px;
-        margin-right: 10px;
-
-        padding: 14px;
-
-        border-radius: 17px;
-    }
-
-    #dropZone {
-        min-height: 165px;
-
-        padding: 24px 15px;
-    }
-
-    #scanner-actions {
-        grid-template-columns: 1fr;
-    }
-
-    #detected-info {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    .result-grid {
-        grid-template-columns:
-            repeat(2, 1fr);
-    }
-
-    .result-card:last-child {
-        grid-column:
-            span 2;
-    }
-
-    .audit-columns {
-        grid-template-columns: 1fr;
-    }
-
-    .method-grid {
-        grid-template-columns:
-            repeat(2, 1fr);
-    }
-
-    .scan-center {
-        min-width: 160px;
-
-        padding: 13px 17px;
-    }
-
-    .scan-label {
-        font-size: 11px;
-    }
-}
-
-/* =========================================================
-   SMALL PHONES
-   ========================================================= */
-
-@media (max-width: 420px) {
-
-    .brand-name {
-        font-size: 16px;
-    }
-
-    .brand-mark {
-        width: 38px;
-        height: 38px;
-    }
-
-    .hero h1 {
-        font-size: 25px;
-    }
-
-    .result-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .result-card:last-child {
-        grid-column: auto;
-    }
-
-    .method-grid {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    .result-signal {
-        font-size: 22px;
-    }
-
-    .scanner-card,
-    .results-card,
-    .method-card {
-        margin-left: 7px;
-        margin-right: 7px;
-    }
+.audit-correct,
+.audit-premature {
+    border-color: rgba(245, 158, 11, 0.35);
+    background: radial-gradient(circle at left, rgba(245, 158, 11, 0.08), transparent 60%);
 }

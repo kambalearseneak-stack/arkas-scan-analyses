@@ -3,6 +3,7 @@
 // api/analyze.js
 // Gemini 3.6 Flash Vision — Stratégie adaptative par marché
 // SMC (Or) / SMC+PA (Forex) / PA simplifiée (Indices+Crypto)
+// + Scénarios multiples (zones)
 // ============================================================
 
 export default async function handler(req, res) {
@@ -117,17 +118,14 @@ export default async function handler(req, res) {
         }
 
         /* ====================================================
-           GEMINI 3.6 FLASH — CORRECTION DU MODÈLE ET PARAMÈTRES
+           GEMINI 3.6 FLASH
            ==================================================== */
 
-        // ✅ Modèle officiel Gemini 3.6 Flash (GA depuis le 21 juillet 2026)
         const model = "gemini-3.6-flash";
 
         const endpoint =
             `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
-        // ⚠️ IMPORTANT : temperature, top_p et top_k sont DÉPRÉCIÉS
-        // pour Gemini 3.x. Ne pas les inclure dans generationConfig.
         const geminiResponse = await fetch(endpoint, {
             method: "POST",
 
@@ -154,7 +152,6 @@ export default async function handler(req, res) {
 
                 generationConfig: {
                     responseMimeType: "application/json"
-                    // ❌ NE PAS AJOUTER temperature/top_p/top_k
                 }
             })
         });
@@ -229,19 +226,16 @@ export default async function handler(req, res) {
 
 /* ============================================================
    CLASSIFICATION DU MARCHÉ
-   Le broker n'a AUCUNE importance — seul le type d'actif compte.
    ============================================================ */
 
 function classifyMarket(asset) {
 
     const a = String(asset || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 
-    /* ---------- OR ---------- */
     if (a.includes("XAU") || a.includes("GOLD")) {
         return "GOLD";
     }
 
-    /* ---------- FOREX ---------- */
     const forexPairs = [
         "EURUSD", "GBPUSD", "USDJPY", "USDCHF",
         "AUDUSD", "NZDUSD", "USDCAD",
@@ -261,17 +255,14 @@ function classifyMarket(asset) {
         return "FOREX";
     }
 
-    /* Détection générique XXXYYY */
     if (/^[A-Z]{6}$/.test(a)) {
         return "FOREX";
     }
 
-    /* ---------- CRYPTO MAJEURES ---------- */
     if (a.includes("BTC") || a.includes("ETH")) {
         return "CRYPTO_MAJOR";
     }
 
-    /* ---------- INDICES ---------- */
     const indices = [
         "US30", "DJ30", "DOW", "WS30",
         "US100", "NAS100", "USTEC", "NDX",
@@ -313,40 +304,74 @@ MARCHÉ : ${asset} (OR — SMC PUR)
 TIMEFRAME : ${timeframe}
 ============================================================
 
-L'or respecte parfaitement les concepts SMC.
-Applique la méthode complète : BOS, CHoCH, Order Block, FVG,
-Liquidity Sweep, Premium/Discount.
-
 ============================================================
-RÈGLES
+RÈGLE FONDAMENTALE — NE JAMAIS RESTER PASSIF
 ============================================================
 
-1. Identifie actif + timeframe. Si invisible : UNKNOWN.
+❌ NE RETOURNE PAS "WAIT" SANS AVOIR CHERCHÉ DE SCÉNARIOS.
 
-2. Recherche en priorité :
-   - Un balayage de liquidité récent
-   - Un CHoCH confirmé suivi d'un BOS
-   - Une entrée dans un OB frais
-   - Un retour dans un FVG non comblé
+✅ MÊME si l'entrée immédiate n'est pas propre, tu DOIS :
+   1. Identifier toutes les zones SMC visibles (OB, FVG, liquidité)
+   2. Proposer AU MOINS 2 scénarios BUY LIMIT / SELL LIMIT
+   3. Donner les prix exacts de chaque zone
+   4. Expliquer le déclencheur attendu dans chaque zone
 
-3. Signal validé par AU MOINS 2 confluences SMC. Sinon WAIT.
+WAIT n'est autorisé QUE si :
+- Le graphique est illisible (flou, trop zoomé, surchargé)
+- Aucune zone identifiable
+- Marché en range total sans direction ni niveaux clairs
 
-4. Sessions idéales :
-   - Londres (08h-11h GMT) : ✅✅
-   - New York (13h-16h GMT) : ✅✅
-   - Overlap : ✅✅✅
-   - Asie : ⚠️ confiance -30%
+============================================================
+ANALYSE SMC
+============================================================
 
-5. Signaux : BUY NOW / SELL NOW / BUY LIMIT / SELL LIMIT / WAIT
+- Structure : tendance, BOS, CHoCH
+- Liquidité : equal highs/lows, sweeps
+- Order Blocks : haussiers et baissiers
+- FVG : non comblés
+- Premium / Discount
 
-6. Niveaux :
-   BUY  : SL < Entry < TP1 < TP2 < TP3
-   SELL : TP3 < TP2 < TP1 < Entry < SL
-   Si TP3 incertain : null
+============================================================
+SIGNAL PRINCIPAL
+============================================================
 
-7. Confiance réduite de 25% (mono-timeframe).
+- BUY NOW / SELL NOW  → entrée immédiate propre
+- BUY LIMIT / SELL LIMIT → attente retour sur zone
+- WAIT → UNIQUEMENT si vraiment illisible
 
-8. Ne force JAMAIS un trade.
+============================================================
+SCÉNARIOS MULTIPLES (OBLIGATOIRE)
+============================================================
+
+Fournis AU MOINS 2 scénarios, jusqu'à 4.
+
+Chaque scénario contient :
+- id          : "A", "B", "C", "D"
+- type        : "BUY_LIMIT" | "SELL_LIMIT" | "BUY_NOW" | "SELL_NOW"
+- zone_label  : "OB haussier H1" | "FVG non comblé" | "Equal lows"
+- zone_price  : prix exact ou plage (ex: "2645.50 - 2648.00")
+- entry, sl, tp1, tp2, tp3, rr
+- trigger     : condition déclenchante
+- probability : "haute" | "moyenne" | "basse"
+- invalidation: condition qui annule le scénario
+- priority    : 1 (meilleur) à 4
+
+============================================================
+NIVEAUX
+============================================================
+
+BUY  : SL < Entry < TP1 < TP2 < TP3
+SELL : TP3 < TP2 < TP1 < Entry < SL
+Si TP3 incertain : null
+
+============================================================
+SESSIONS (Or)
+============================================================
+
+- Londres 08-11h GMT : ✅✅
+- NY 13-16h GMT : ✅✅
+- Overlap : ✅✅✅
+- Asie : -30%
 
 ============================================================
 FORMAT JSON (aucun Markdown, aucun texte autour)
@@ -357,8 +382,8 @@ FORMAT JSON (aucun Markdown, aucun texte autour)
   "timeframe": "",
   "market_type": "GOLD",
   "strategy_applied": "SMC",
-  "signal": "",
-  "direction": "",
+  "signal": "BUY NOW|SELL NOW|BUY LIMIT|SELL LIMIT|WAIT",
+  "direction": "BUY|SELL|WAIT|UNKNOWN",
   "confidence_percent": 0,
   "entry": null,
   "sl": null,
@@ -367,15 +392,32 @@ FORMAT JSON (aucun Markdown, aucun texte autour)
   "tp3": null,
   "rr": null,
   "arkas_score": 0,
+
   "structure": "",
   "liquidity": "",
   "order_block": "",
   "fvg": "",
   "price_action": "",
-  "supports_resistances": "N/A (SMC pur)",
-  "trendlines": "N/A (SMC pur)",
-  "breakout": "N/A (SMC pur)",
-  "retest": "N/A (SMC pur)",
+
+  "zones": [
+    {
+      "id": "A",
+      "type": "BUY_LIMIT",
+      "zone_label": "",
+      "zone_price": "",
+      "entry": null,
+      "sl": null,
+      "tp1": null,
+      "tp2": null,
+      "tp3": null,
+      "rr": null,
+      "trigger": "",
+      "probability": "haute|moyenne|basse",
+      "invalidation": "",
+      "priority": 1
+    }
+  ],
+
   "primary_scenario": "",
   "alternative_scenario": "",
   "invalidation": "",
@@ -410,51 +452,55 @@ MARCHÉ : ${asset} (FOREX — STRATÉGIE HYBRIDE)
 TIMEFRAME : ${timeframe}
 ============================================================
 
-⚠️ Le Forex nécessite une CONFLUENCE de DEUX analyses.
-Un signal n'est donné QUE SI les deux sont alignées.
-
 ============================================================
-ANALYSE 1 — SMC
+RÈGLE FONDAMENTALE — NE JAMAIS RESTER PASSIF
 ============================================================
 
-Recherche :
-- BOS (Break of Structure)
-- CHoCH (Change of Character)
-- Order Block
-- Fair Value Gap
-- Liquidity Sweep
-- Premium / Discount
+❌ NE RETOURNE PAS "WAIT" SANS AVOIR CHERCHÉ DE SCÉNARIOS.
+
+✅ MÊME si SMC et PA ne sont pas alignés, tu DOIS proposer
+   AU MOINS 2 scénarios BUY LIMIT / SELL LIMIT sur les zones clés.
+
+WAIT n'est autorisé QUE si :
+- Graphique illisible
+- Aucune zone exploitable
+- Range sans niveaux clairs
 
 ============================================================
-ANALYSE 2 — PRICE ACTION
+DOUBLE ANALYSE
 ============================================================
 
-Recherche :
-- Supports / Résistances majeurs
-- Trendlines (haussières / baissières)
-- Cassure (breakout) confirmée
-- Retest du niveau cassé
-- Momentum (bougies, séquences)
-- Structure classique : HH/HL ou LH/LL
+ANALYSE 1 — SMC :
+- BOS, CHoCH, Order Block, FVG, Liquidity Sweep
+
+ANALYSE 2 — PRICE ACTION :
+- Supports / Résistances, Trendlines, Cassure, Retest, Momentum
+
+CONFLUENCE :
+✅ BOTH alignés → BUY NOW / SELL NOW
+🟡 PARTIEL → LIMIT (confiance -20%)
+❌ DÉSACCORD → LIMIT sur les deux zones opposées
 
 ============================================================
-RÈGLE DE CONFLUENCE (CRITIQUE)
+SCÉNARIOS MULTIPLES (OBLIGATOIRE)
 ============================================================
 
-✅ BOTH alignés → signal confirmé
-❌ Désaccord → WAIT
-🟡 SMC neutre + PA clair → LIMIT (confiance -20%)
-🟡 SMC clair + PA neutre → LIMIT (confiance -20%)
+Fournis AU MOINS 2 scénarios, jusqu'à 4.
+
+Chaque scénario :
+- id, type, zone_label, zone_price
+- entry, sl, tp1, tp2, tp3, rr
+- trigger, probability, invalidation, priority
 
 ============================================================
 SESSIONS
 ============================================================
 
-- Londres (08h-11h GMT) : ✅✅
-- New York (13h-16h GMT) : ✅✅
-- Overlap (13h-16h GMT) : ✅✅✅
-- Asie : ⚠️ confiance -40% (sauf JPY/AUD/NZD)
-- Vendredi après 20h GMT : ❌ WAIT
+- Londres 08-11h GMT : ✅✅
+- NY 13-16h GMT : ✅✅
+- Overlap : ✅✅✅
+- Asie : -40% (sauf JPY/AUD/NZD)
+- Vendredi après 20h GMT : WAIT
 
 ============================================================
 NIVEAUX
@@ -462,15 +508,7 @@ NIVEAUX
 
 BUY  : SL < Entry < TP1 < TP2 < TP3
 SELL : TP3 < TP2 < TP1 < Entry < SL
-RR minimum : 1.5 (sinon WAIT)
-
-============================================================
-CONFIANCE
-============================================================
-
-Base : -25% (mono-timeframe)
-Bonus : +10% si SMC et PA alignés, +10% session optimale, +5% si RR>2
-Malus : -20% désaccord partiel, -40% session asiatique, -50% TF < M15
+RR minimum : 1.5
 
 ============================================================
 FORMAT JSON (aucun Markdown, aucun texte autour)
@@ -491,6 +529,7 @@ FORMAT JSON (aucun Markdown, aucun texte autour)
   "tp3": null,
   "rr": null,
   "arkas_score": 0,
+
   "smc_analysis": {
     "structure": "",
     "bos": "",
@@ -500,6 +539,7 @@ FORMAT JSON (aucun Markdown, aucun texte autour)
     "liquidity": "",
     "bias": "BUY|SELL|NEUTRAL"
   },
+
   "pa_analysis": {
     "supports_resistances": "",
     "trendlines": "",
@@ -508,7 +548,9 @@ FORMAT JSON (aucun Markdown, aucun texte autour)
     "momentum": "",
     "bias": "BUY|SELL|NEUTRAL"
   },
+
   "confluence_status": "ALIGNED|PARTIAL|DISAGREEMENT|NEUTRAL",
+
   "structure": "",
   "liquidity": "",
   "order_block": "",
@@ -518,6 +560,26 @@ FORMAT JSON (aucun Markdown, aucun texte autour)
   "trendlines": "",
   "breakout": "",
   "retest": "",
+
+  "zones": [
+    {
+      "id": "A",
+      "type": "BUY_LIMIT",
+      "zone_label": "",
+      "zone_price": "",
+      "entry": null,
+      "sl": null,
+      "tp1": null,
+      "tp2": null,
+      "tp3": null,
+      "rr": null,
+      "trigger": "",
+      "probability": "haute|moyenne|basse",
+      "invalidation": "",
+      "priority": 1
+    }
+  ],
+
   "primary_scenario": "",
   "alternative_scenario": "",
   "invalidation": "",
@@ -540,7 +602,7 @@ ${userPrompt}
 
 
 /* ============================================================
-   PROMPT 3 — INDICES + CRYPTO (PRICE ACTION SIMPLIFIÉE)
+   PROMPT 3 — INDICES + CRYPTO (PA SIMPLIFIÉE)
    ============================================================ */
 
 function buildSimplePriceActionPrompt(asset, timeframe, marketType, userPrompt) {
@@ -552,57 +614,78 @@ MARCHÉ : ${asset} (${marketType})
 TIMEFRAME : ${timeframe}
 ============================================================
 
-⚠️ Ce marché NE respecte PAS les concepts SMC institutionnels.
-On utilise UNIQUEMENT la Price Action classique.
+============================================================
+RÈGLE FONDAMENTALE — NE JAMAIS RESTER PASSIF
+============================================================
+
+❌ NE RETOURNE PAS "WAIT" SANS AVOIR CHERCHÉ DE SCÉNARIOS.
+
+✅ MÊME sans configuration parfaite, tu DOIS proposer AU MOINS
+   2 scénarios BUY LIMIT / SELL LIMIT sur :
+   - Supports majeurs
+   - Résistances majeures
+   - Trendlines
+   - Zones de cassure/retest
+
+WAIT n'est autorisé QUE si :
+- Graphique illisible
+- Aucune zone identifiable
+- Marché totalement plat
 
 ============================================================
 OUTILS AUTORISÉS
 ============================================================
 
-1. SUPPORTS / RÉSISTANCES
-2. TRENDLINES
-3. CASSURE (breakout)
-4. RETEST
-5. MOMENTUM
-6. STRUCTURE SIMPLIFIÉE (HH/HL ou LH/LL)
+1. Supports / Résistances
+2. Trendlines
+3. Cassure (breakout)
+4. Retest
+5. Momentum
+6. Structure simplifiée (HH/HL ou LH/LL)
 
 ============================================================
 OUTILS INTERDITS
 ============================================================
 
-❌ Order Block — remplis avec "N/A (Price Action simplifiée)"
-❌ FVG — idem
-❌ CHoCH SMC — idem
-❌ Liquidity sweep — idem
-❌ Premium/Discount — idem
+❌ Order Block → "N/A (Price Action simplifiée)"
+❌ FVG → idem
+❌ CHoCH SMC → idem
+❌ Liquidity sweep → idem
 
 ============================================================
-PRUDENCE SELON MARCHÉ
+PRUDENCE
 ============================================================
 
 Indices :
 - Ouverture US (15h30-16h00 GMT) : WAIT
-- Fermeture US : confiance -
 - Timeframe minimum : M15
 
 Crypto (BTC/ETH) :
-- Volatilité 3-5x Forex
-- Week-end : confiance -30%
-- Timeframe minimum : H1 (M15 si très clair)
+- Volatilité 3-5x
+- Week-end : -30%
+- Timeframe minimum : H1
 
 Altcoins / Autres :
 - Timeframe minimum : H4
 - Confiance max : 50%
-- WAIT si doute
 
 ============================================================
-RÈGLES
+SCÉNARIOS MULTIPLES (OBLIGATOIRE)
 ============================================================
 
-1. RR minimum : 1.5 (sinon WAIT).
-2. Confiance réduite de 35% par défaut.
-3. TF < TF minimum → confiance max 40%.
-4. Ne force JAMAIS un trade.
+Fournis AU MOINS 2 scénarios, jusqu'à 4.
+Exemples :
+- "BUY LIMIT sur support majeur à 4250"
+- "SELL LIMIT sur résistance à 4320"
+- "BUY LIMIT sur retest trendline à 4270"
+
+============================================================
+NIVEAUX
+============================================================
+
+BUY  : SL < Entry < TP1 < TP2 < TP3
+SELL : TP3 < TP2 < TP1 < Entry < SL
+RR minimum : 1.5
 
 ============================================================
 FORMAT JSON (aucun Markdown, aucun texte autour)
@@ -623,15 +706,37 @@ FORMAT JSON (aucun Markdown, aucun texte autour)
   "tp3": null,
   "rr": null,
   "arkas_score": 0,
+
   "structure": "",
   "supports_resistances": "",
   "trendlines": "",
   "breakout": "",
   "retest": "",
   "momentum": "",
+
   "liquidity": "N/A (Price Action simplifiée)",
   "order_block": "N/A (Price Action simplifiée)",
   "fvg": "N/A (Price Action simplifiée)",
+
+  "zones": [
+    {
+      "id": "A",
+      "type": "BUY_LIMIT",
+      "zone_label": "",
+      "zone_price": "",
+      "entry": null,
+      "sl": null,
+      "tp1": null,
+      "tp2": null,
+      "tp3": null,
+      "rr": null,
+      "trigger": "",
+      "probability": "haute|moyenne|basse",
+      "invalidation": "",
+      "priority": 1
+    }
+  ],
+
   "primary_scenario": "",
   "alternative_scenario": "",
   "invalidation": "",
@@ -654,7 +759,7 @@ ${userPrompt}
 
 
 /* ============================================================
-   PROMPT AUDIT (mode VÉRIFIER MON ANALYSE)
+   PROMPT AUDIT
    ============================================================ */
 
 function buildAuditPrompt(asset, timeframe, userPrompt) {
@@ -676,8 +781,7 @@ Ne considère PAS les annotations comme correctes par défaut.
 1. Lire l'analyse utilisateur (flèches, lignes, texte, niveaux)
 2. Faire une analyse indépendante
 3. Comparer
-4. Statuer :
-   VALIDATED / CORRECT / PREMATURE / INVALID / UNCLEAR
+4. Statuer : VALIDATED / CORRECT / PREMATURE / INVALID / UNCLEAR
 5. Proposer une correction si nécessaire
 
 ============================================================
@@ -711,6 +815,7 @@ FORMAT JSON (aucun Markdown)
   "risk_management": {},
   "economic_news": "Non disponible — vérifier le calendrier.",
   "risk_warning": "",
+  "zones": [],
   "audit": {
     "status": "VALIDATED|CORRECT|PREMATURE|INVALID|UNCLEAR",
     "detected_user_analysis": {
@@ -749,7 +854,7 @@ ${userPrompt}
 
 
 /* ============================================================
-   PARSING JSON ROBUSTE
+   PARSING JSON
    ============================================================ */
 
 function parseJsonSafely(text) {
@@ -823,6 +928,8 @@ function normalizeResult(data, asset, timeframe, mode) {
         pa_analysis: data.pa_analysis || null,
         confluence_status: data.confluence_status || null,
 
+        zones: normalizeZones(data.zones),
+
         primary_scenario: data.primary_scenario || "",
         alternative_scenario: data.alternative_scenario || "",
         invalidation: data.invalidation || "",
@@ -843,6 +950,40 @@ function normalizeResult(data, asset, timeframe, mode) {
     result.arkas_score = clamp(result.arkas_score, 0, 100);
 
     return result;
+}
+
+
+/* ============================================================
+   NORMALISATION DES ZONES
+   ============================================================ */
+
+function normalizeZones(zones) {
+
+    if (!Array.isArray(zones)) return [];
+
+    return zones
+        .map((z, idx) => ({
+
+            id: String(z.id || String.fromCharCode(65 + idx)),
+            type: String(z.type || "BUY_LIMIT").toUpperCase(),
+
+            zone_label: z.zone_label || "",
+            zone_price: z.zone_price || "",
+
+            entry: normalizeNumber(z.entry),
+            sl: normalizeNumber(z.sl),
+            tp1: normalizeNumber(z.tp1),
+            tp2: normalizeNumber(z.tp2),
+            tp3: normalizeNumber(z.tp3),
+            rr: normalizeNumber(z.rr),
+
+            trigger: z.trigger || "",
+            probability: z.probability || "moyenne",
+            invalidation: z.invalidation || "",
+            priority: Number(z.priority) || (idx + 1)
+        }))
+        .filter(z => z.entry !== null || z.zone_price)
+        .sort((a, b) => a.priority - b.priority);
 }
 
 
@@ -920,8 +1061,7 @@ function validateTradeLevels(result) {
             (tp3 === null || tp3 > tp2);
         if (!valid) {
             result.trade_valid = false;
-            result.risk_warning =
-                "Niveaux BUY invalides (Entry/SL/TP).";
+            result.risk_warning = "Niveaux BUY invalides.";
         }
         return;
     }
@@ -931,8 +1071,7 @@ function validateTradeLevels(result) {
             (tp3 === null || tp3 < tp2);
         if (!valid) {
             result.trade_valid = false;
-            result.risk_warning =
-                "Niveaux SELL invalides (Entry/SL/TP).";
+            result.risk_warning = "Niveaux SELL invalides.";
         }
         return;
     }

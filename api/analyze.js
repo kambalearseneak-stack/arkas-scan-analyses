@@ -120,7 +120,7 @@ export default async function handler(req, res) {
            GEMINI
            ==================================================== */
 
-        const model = "gemini-2.0-flash-exp";
+        const model = "gemini-3.6-flash-exp";
 
         const endpoint =
             `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;

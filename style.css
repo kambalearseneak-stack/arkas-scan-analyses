@@ -1,6 +1,6 @@
 /* =========================================================
    ARKAS SCAN AI V2 — STYLE COMPLET
-   Login + Dashboard + Scanner + Audit + Stratégie adaptative
+   Login + Dashboard + Scanner + Audit + Scénarios multiples
    ========================================================= */
 
 /* =========================================================
@@ -67,10 +67,8 @@ body {
   background-attachment: scroll;
   position: relative;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Overlay sombre sur l'image */
 body::before {
   content: "";
   position: fixed;
@@ -93,7 +91,7 @@ body::before {
 
 
 /* =========================================================
-   3. TOPBAR (dashboard)
+   3. TOPBAR
    ========================================================= */
 .topbar {
   position: sticky;
@@ -135,7 +133,6 @@ body::before {
   color: var(--text-primary);
   margin: 0;
   line-height: 1.2;
-  letter-spacing: 0.02em;
 }
 
 .brand span {
@@ -182,7 +179,7 @@ body::before {
 
 
 /* =========================================================
-   4. CONTAINER PRINCIPAL
+   4. CONTAINER
    ========================================================= */
 .container {
   max-width: 1100px;
@@ -537,7 +534,6 @@ body::before {
   font-size: 0.85rem;
 }
 
-/* Signal principal */
 .result-main {
   padding: 1.25rem;
   border-radius: var(--radius-md);
@@ -566,7 +562,6 @@ body::before {
   color: var(--text-secondary);
 }
 
-/* Grille de cartes résultats */
 .result-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
@@ -597,7 +592,6 @@ body::before {
   word-break: break-word;
 }
 
-/* Détails d'analyse */
 .analysis-details {
   display: flex;
   flex-direction: column;
@@ -624,7 +618,6 @@ body::before {
   word-break: break-word;
 }
 
-/* Bouton copier */
 .copy-signal-area {
   margin-top: 1.25rem;
   text-align: center;
@@ -826,7 +819,7 @@ footer {
 
 
 /* =========================================================
-   17. EFFET SCAN (overlay sur l'image)
+   17. EFFET SCAN
    ========================================================= */
 .scan-image-wrapper {
   position: relative;
@@ -954,7 +947,7 @@ footer {
 
 
 /* =========================================================
-   18. ANIMATIONS GLOBALES
+   18. ANIMATIONS
    ========================================================= */
 @keyframes fadeIn {
   from { opacity: 0; }
@@ -1070,7 +1063,6 @@ footer {
 /* =========================================================
    20. PAGE DE CONNEXION / INSCRIPTION
    ========================================================= */
-
 .login-container {
   position: relative;
   z-index: 2;
@@ -1094,7 +1086,6 @@ footer {
   animation: fadeInUp 0.5s ease both;
 }
 
-/* ---------- BRAND ---------- */
 .login-brand {
   text-align: center;
   margin-bottom: 0.75rem;
@@ -1126,7 +1117,6 @@ footer {
   letter-spacing: 0.12em;
 }
 
-/* ---------- SUBTITLE ---------- */
 .login-subtitle {
   font-size: 0.85rem;
   color: var(--text-secondary);
@@ -1135,7 +1125,6 @@ footer {
   line-height: 1.5;
 }
 
-/* ---------- FORMULAIRE ---------- */
 .login-form {
   display: flex;
   flex-direction: column;
@@ -1182,7 +1171,6 @@ footer {
   background: #111c33;
 }
 
-/* ---------- BOUTON PRINCIPAL ---------- */
 .btn-primary {
   width: 100%;
   padding: 0.85rem 1rem;
@@ -1204,17 +1192,12 @@ footer {
   box-shadow: var(--shadow-glow);
 }
 
-.btn-primary:active:not(:disabled) {
-  transform: translateY(0);
-}
-
 .btn-primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
 }
 
-/* ---------- TOGGLE LOGIN/SIGNUP ---------- */
 .toggle-container {
   margin-top: 1.5rem;
   text-align: center;
@@ -1239,7 +1222,6 @@ footer {
   text-decoration: underline;
 }
 
-/* ---------- MESSAGE D'ERREUR ---------- */
 .error-message {
   display: none;
   margin-top: 1rem;
@@ -1258,7 +1240,6 @@ footer {
   animation: fadeIn 0.25s ease both;
 }
 
-/* ---------- FOOTER LOGIN ---------- */
 .login-footer {
   display: flex;
   align-items: center;
@@ -1271,7 +1252,6 @@ footer {
   color: var(--text-muted);
 }
 
-/* ---------- RESPONSIVE LOGIN ---------- */
 @media (max-width: 480px) {
   .login-container {
     padding: 1rem;
@@ -1299,7 +1279,6 @@ footer {
 /* =========================================================
    21. BADGE STRATÉGIE + MARCHÉ
    ========================================================= */
-
 .strategy-badge {
   display: inline-flex;
   align-items: center;
@@ -1323,7 +1302,6 @@ footer {
   letter-spacing: 0.05em;
 }
 
-/* Badges par stratégie */
 .strat-smc {
   border-color: rgba(0, 230, 118, 0.5);
   background: rgba(0, 230, 118, 0.12);
@@ -1353,9 +1331,8 @@ footer {
 
 
 /* =========================================================
-   22. BANNIÈRE CONFLUENCE (FOREX SMC + PA)
+   22. BANNIÈRE CONFLUENCE (FOREX)
    ========================================================= */
-
 .confluence-banner {
   padding: 0.75rem 1rem;
   border-radius: var(--radius-sm);
@@ -1397,7 +1374,6 @@ footer {
 /* =========================================================
    23. LOADER GLOBAL
    ========================================================= */
-
 .global-loader {
   position: fixed;
   inset: 0;
@@ -1447,9 +1423,174 @@ footer {
 
 
 /* =========================================================
-   24. SCROLLBAR PERSONNALISÉE
+   24. SCÉNARIOS MULTIPLES (ZONES)
    ========================================================= */
+.zones-section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-subtle);
+}
 
+.zones-title {
+  font-size: 1rem;
+  color: var(--color-primary);
+  margin-bottom: 1rem;
+  letter-spacing: 0.03em;
+}
+
+.zones-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.85rem;
+}
+
+@media (min-width: 700px) {
+  .zones-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.zone-card {
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  border-left: 4px solid;
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  transition: all var(--transition);
+}
+
+.zone-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.zone-buy  { border-left-color: var(--color-primary); }
+.zone-sell { border-left-color: var(--color-danger); }
+
+.zone-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.zone-id {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(0, 230, 118, 0.15);
+  color: var(--color-primary);
+  font-weight: 900;
+  font-size: 0.75rem;
+}
+
+.zone-sell .zone-id {
+  background: rgba(255, 82, 82, 0.15);
+  color: var(--color-danger);
+}
+
+.zone-type {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-primary);
+  text-transform: uppercase;
+}
+
+.zone-priority {
+  margin-left: auto;
+  font-size: 0.68rem;
+  padding: 0.15rem 0.5rem;
+  background: rgba(255, 179, 0, 0.15);
+  color: var(--color-warning);
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.zone-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.35rem;
+}
+
+.zone-price {
+  font-size: 0.78rem;
+  color: var(--color-info);
+  margin-bottom: 0.6rem;
+  font-family: 'Courier New', monospace;
+}
+
+.zone-levels {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+
+.zone-levels > div {
+  background: rgba(15, 23, 42, 0.6);
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.zone-levels span {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.zone-levels strong {
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.zone-probability {
+  font-size: 0.75rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+.prob-high { background: rgba(0, 230, 118, 0.12); color: var(--color-primary); }
+.prob-mid  { background: rgba(255, 179, 0, 0.12); color: var(--color-warning); }
+.prob-low  { background: rgba(100, 116, 139, 0.12); color: var(--text-muted); }
+
+.zone-trigger,
+.zone-invalidation {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.35rem;
+  padding: 0.4rem 0.6rem;
+  background: rgba(41, 182, 246, 0.06);
+  border-radius: 4px;
+  border-left: 2px solid var(--color-info);
+}
+
+.zone-invalidation {
+  background: rgba(255, 179, 0, 0.06);
+  border-left-color: var(--color-warning);
+}
+
+.zone-trigger strong,
+.zone-invalidation strong {
+  color: var(--text-primary);
+}
+
+
+/* =========================================================
+   25. SCROLLBAR
+   ========================================================= */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

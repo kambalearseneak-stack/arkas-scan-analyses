@@ -1,166 +1,157 @@
-/* =========================================================
-   ARKAS SCAN AI V2
-   api/analyze.js
-
-   Vercel Serverless Function
-   Gemini Vision sécurisé
-   MODE SCAN + MODE AUDIT
-   ========================================================= */
+// ============================================================
+// ARKAS SCAN AI V2
+// api/analyze.js
+// Gemini Vision backend
+// ============================================================
 
 export default async function handler(req, res) {
 
-    /* =====================================================
-       CORS
-    ====================================================== */
+    // ========================================================
+    // CORS
+    // ========================================================
 
-    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader(
+        "Access-Control-Allow-Origin",
+        "*"
+    );
+
     res.setHeader(
         "Access-Control-Allow-Methods",
         "POST, OPTIONS"
     );
+
     res.setHeader(
         "Access-Control-Allow-Headers",
         "Content-Type"
     );
 
+    // Préflight
     if (req.method === "OPTIONS") {
-        return res.status(204).end();
+        return res.status(200).end();
     }
 
+    // Seulement POST
     if (req.method !== "POST") {
+
         return res.status(405).json({
-            success: false,
-            error: "Méthode non autorisée."
+            error: "Méthode non autorisée. Utilisez POST."
         });
+
     }
 
-    /* =====================================================
-       API KEY
-    ====================================================== */
+    try {
 
-    const apiKey = process.env.GEMINI_API_KEY;
+        // ====================================================
+        // API KEY
+        // ====================================================
 
-    if (!apiKey) {
-        console.error("GEMINI_API_KEY manquante.");
+        const apiKey =
+            process.env.GEMINI_API_KEY;
 
-        return res.status(500).json({
-            success: false,
-            error:
-                "La clé Gemini n'est pas configurée sur le serveur."
-        });
-    }
+        if (!apiKey) {
 
-    /* =====================================================
-       DONNÉES
-    ====================================================== */
+            return res.status(500).json({
+                error:
+                    "GEMINI_API_KEY est absente des variables d'environnement Vercel."
+            });
 
-    const body = req.body || {};
+        }
 
-    const {
-        imageBase64,
-        mimeType,
-        prompt,
-        accountBalance,
-        riskPercent,
-        valuePerPriceUnitPerLot,
-        asset,
-        timeframe,
-        mode
-    } = body;
+        // ====================================================
+        // BODY
+        // ====================================================
 
-    /* =====================================================
-       VALIDATION IMAGE
-    ====================================================== */
+        const body =
+            req.body || {};
 
-    if (!imageBase64) {
-        return res.status(400).json({
-            success: false,
-            error: "Aucune image graphique reçue."
-        });
-    }
+        const imageBase64 =
+            body.imageBase64;
 
-    const allowedMimeTypes = [
-        "image/jpeg",
-        "image/png",
-        "image/webp"
-    ];
+        const mimeType =
+            body.mimeType || "image/jpeg";
 
-    const finalMimeType =
-        allowedMimeTypes.includes(mimeType)
-            ? mimeType
-            : "image/jpeg";
+        const mode =
+            body.mode === "audit"
+                ? "audit"
+                : "scan";
 
-    if (
-        typeof imageBase64 !== "string" ||
-        imageBase64.length > 12_000_000
-    ) {
-        return res.status(413).json({
-            success: false,
-            error:
-                "Image trop volumineuse. Utilisez une image de moins de 10 MB."
-        });
-    }
+        const asset =
+            body.asset || "AUTO";
 
-    /* =====================================================
-       MODE
-    ====================================================== */
+        const timeframe =
+            body.timeframe || "AUTO";
 
-    const analysisMode =
-        mode === "audit"
-            ? "audit"
-            : "scan";
+        const userPrompt =
+            body.prompt || "";
 
-    /* =====================================================
-       INFORMATIONS RISQUE
-    ====================================================== */
+        // ====================================================
+        // VALIDATION IMAGE
+        // ====================================================
 
-    const balance =
-        Number(accountBalance);
+        if (!imageBase64) {
 
-    const risk =
-        Number(riskPercent);
+            return res.status(400).json({
+                error:
+                    "Aucune image n'a été envoyée."
+            });
 
-    const valueLot =
-        Number(valuePerPriceUnitPerLot);
+        }
 
-    let riskInformation = "";
+        const allowedMimeTypes = [
+            "image/jpeg",
+            "image/png",
+            "image/webp"
+        ];
 
-    if (
-        Number.isFinite(balance) &&
-        balance > 0 &&
-        Number.isFinite(risk) &&
-        risk > 0
-    ) {
-        const riskMoney =
-            balance * (risk / 100);
+        if (
+            !allowedMimeTypes.includes(
+                mimeType
+            )
+        ) {
 
-        riskInformation = `
-Compte :
-- Capital = ${balance}
-- Risque demandé = ${risk}%
-- Montant maximum risqué = ${riskMoney}
-`;
-    }
+            return res.status(400).json({
+                error:
+                    "Format d'image non supporté. Utilisez JPG, PNG ou WebP."
+            });
 
-    if (
-        Number.isFinite(valueLot) &&
-        valueLot > 0
-    ) {
-        riskInformation += `
-Valeur monétaire par unité de prix pour 1 lot :
-${valueLot}
-`;
-    }
+        }
 
-    /* =====================================================
-       PROMPT SCAN
-    ====================================================== */
+        // Protection taille
+        if (
+            imageBase64.length >
+            12000000
+        ) {
 
-    const scanPrompt = `
+            return res.status(413).json({
+                error:
+                    "Image trop volumineuse pour l'analyse."
+            });
 
-Tu es ARKAS SCAN AI V2.
+        }
 
-Tu es un analyste spécialisé en :
+        // ====================================================
+        // PROMPT SCAN
+        // ====================================================
+
+        const scanPrompt = `
+
+Tu es ARKAS SCAN AI V2,
+un système expert d'analyse technique de graphiques.
+
+Tu analyses UNIQUEMENT les informations réellement
+visibles dans l'image.
+
+MARCHÉ DEMANDÉ :
+${asset}
+
+TIMEFRAME DEMANDÉ :
+${timeframe}
+
+============================================================
+OBJECTIF
+============================================================
+
+Analyse le graphique avec une approche principalement :
 
 - Price Action
 - Smart Money Concepts
@@ -173,553 +164,16 @@ Tu es un analyste spécialisé en :
 - Support / Resistance
 - Breakout
 - Retest
-- Risk Management
-
-Tu analyses une CAPTURE D'ÉCRAN d'un graphique.
-
-==================================================
-RÈGLE PRINCIPALE
-==================================================
-
-Analyse ce qui est réellement visible.
-
-Ne considère jamais une information comme certaine
-si elle n'est pas visible ou raisonnablement déductible.
-
-Ne fabrique jamais un prix.
-
-Si le prix est lisible, utilise-le.
-
-Si le prix est difficile à lire, tu peux fournir
-une estimation raisonnable uniquement si elle est
-cohérente avec l'échelle visible.
-
-==================================================
-OBJECTIF
-==================================================
-
-Tu dois chercher le meilleur scénario actuel.
-
-Les possibilités sont :
-
-BUY NOW
-SELL NOW
-BUY LIMIT
-SELL LIMIT
-WAIT
-
-WAIT ne doit PAS être utilisé simplement parce que
-le graphique n'est pas parfait.
-
-Si plusieurs confirmations visibles indiquent clairement
-une direction, donne un signal.
-
-==================================================
-BUY NOW
-==================================================
-
-Utilise BUY NOW lorsque :
-
-- structure haussière
-- ou BOS haussier
-- ou CHoCH haussier confirmé
-- momentum haussier
-- zone de demande / OB / support pertinente
-- confirmation Price Action
-- risque acceptable
-
-==================================================
-SELL NOW
-==================================================
-
-Utilise SELL NOW lorsque :
-
-- structure baissière
-- ou BOS baissier
-- ou CHoCH baissier confirmé
-- momentum baissier
-- zone d'offre / OB / résistance pertinente
-- confirmation Price Action
-- risque acceptable
-
-==================================================
-BUY LIMIT
-==================================================
-
-Utilise BUY LIMIT lorsque le scénario haussier
-est suffisamment clair mais que le meilleur point
-d'entrée se trouve plus bas.
-
-Exemples :
-
-- retour sur Bullish OB
-- retour sur FVG
-- retest
-- support
-- zone de demande
-
-Donne le prix exact ou estimé raisonnablement
-à partir du graphique.
-
-==================================================
-SELL LIMIT
-==================================================
-
-Utilise SELL LIMIT lorsque le scénario baissier
-est suffisamment clair mais que le meilleur point
-d'entrée se trouve plus haut.
-
-Exemples :
-
-- retour sur Bearish OB
-- FVG
-- résistance
-- zone d'offre
-- retest
-
-==================================================
-STRUCTURE
-==================================================
-
-Analyse :
-
-- tendance
-- HH
-- HL
-- LH
-- LL
-- BOS
-- CHoCH
-- structure externe
-- structure interne
-- range
-
-==================================================
-LIQUIDITÉ
-==================================================
-
-Recherche :
-
-- Buy Side Liquidity
-- Sell Side Liquidity
-- Equal Highs
-- Equal Lows
-- Liquidity Sweep
-- Stop Hunt
-- prise de liquidité
-
-==================================================
-ORDER BLOCK
-==================================================
-
-Identifie uniquement les Order Blocks
-réellement visibles.
-
-==================================================
-FVG
-==================================================
-
-Identifie uniquement les FVG
-réellement visibles.
-
-==================================================
-PRICE ACTION
-==================================================
-
-Recherche :
-
-- Engulfing
-- Pin Bar
-- Rejection
-- Breakout
-- Retest
-- Displacement
-- Continuation
-- Reversal
-
-==================================================
-SCÉNARIOS
-==================================================
-
-Fournis :
-
-SCÉNARIO PRINCIPAL :
-
-SI [condition]
-ALORS [action]
-
-SCÉNARIO ALTERNATIF :
-
-SI [condition]
-ALORS [action]
-
-==================================================
-TRADE
-==================================================
-
-Pour BUY :
-
-SL < Entry < TP1 < TP2 < TP3
-
-Pour SELL :
-
-TP3 < TP2 < TP1 < Entry < SL
-
-RR principal = distance Entry → TP2
-divisée par distance Entry → SL.
-
-==================================================
-SCORE ARKAS
-==================================================
-
-Score sur 100.
-
-Structure = 25
-Liquidity = 20
-Order Block = 15
-FVG = 15
-Price Action = 15
-Risk/Reward = 10
-
-Ne force PAS WAIT uniquement parce que le score
-est inférieur à 50.
-
-Le score doit représenter la qualité réelle
-du setup.
-
-==================================================
-CONFIDENCE
-==================================================
-
-Donne une confiance entre 0 et 100%.
-
-La confiance ne signifie PAS une probabilité
-réelle de gagner le trade.
-
-Elle représente uniquement la qualité et la
-cohérence des éléments visibles.
-
-==================================================
-RISK MANAGEMENT
-==================================================
-
-Si les informations du compte sont disponibles :
-
-Calcule :
-
-Montant à risquer =
-capital × risque %
-
-Distance SL =
-abs(Entry - SL)
-
-Lot =
-montant à risquer /
-(distance SL × valeur par unité de prix par lot)
-
-Si la valeur par lot n'est pas fournie,
-ne fabrique PAS le lot.
-
-==================================================
-NEWS
-==================================================
-
-Ne fabrique jamais une actualité économique.
-
-Si aucune donnée de news n'est fournie :
-
-available = false
-
-==================================================
-JSON
-==================================================
-
-Réponds UNIQUEMENT avec un JSON valide.
-
-Format :
-
-{
-  "asset": "",
-  "timeframe": "",
-
-  "signal": "BUY NOW|SELL NOW|BUY LIMIT|SELL LIMIT|WAIT",
-  "direction": "BUY|SELL|WAIT",
-  "execution": "MARKET|LIMIT|NONE",
-
-  "market_bias": "",
-
-  "trade_valid": false,
-  "confidence_percent": 0,
-
-  "entry": null,
-  "sl": null,
-  "tp1": null,
-  "tp2": null,
-  "tp3": null,
-  "rr": null,
-
-  "arkas_score": 0,
-
-  "structure": {
-    "bos": "",
-    "choch": "",
-    "trend": "",
-    "description": ""
-  },
-
-  "liquidity": {
-    "type": "",
-    "description": ""
-  },
-
-  "order_block": {
-    "detected": false,
-    "type": "",
-    "zone": "",
-    "description": ""
-  },
-
-  "fvg": {
-    "detected": false,
-    "type": "",
-    "zone": "",
-    "description": ""
-  },
-
-  "price_action": {
-    "confirmation": "",
-    "description": ""
-  },
-
-  "score_breakdown": {
-    "structure": 0,
-    "liquidity": 0,
-    "order_block": 0,
-    "fvg": 0,
-    "price_action": 0,
-    "risk_reward": 0
-  },
-
-  "risk_management": {
-    "account_balance": null,
-    "risk_percent": null,
-    "risk_amount": null,
-    "sl_distance": null,
-    "lot": null,
-    "description": ""
-  },
-
-  "primary_scenario": {
-    "condition": "",
-    "action": ""
-  },
-
-  "alternative_scenario": {
-    "condition": "",
-    "action": ""
-  },
-
-  "invalidation": "",
-
-  "economic_news": {
-    "available": false,
-    "impact": "",
-    "description": ""
-  },
-
-  "reason": "",
-  "risk_warning": ""
-}
-
-==================================================
-CONSIGNES FINALES
-==================================================
-
-Ne réponds jamais avec du Markdown.
-
-Ne mets jamais de texte avant le JSON.
-
-Ne mets jamais de texte après le JSON.
-
-${riskInformation}
-
-Informations supplémentaires :
-
-${typeof prompt === "string" ? prompt : ""}
-
-Asset fourni :
-${asset || "À déterminer depuis le graphique"}
-
-Timeframe fourni :
-${timeframe || "À déterminer depuis le graphique"}
-
-Analyse maintenant l'image.
-`;
-
-    /* =====================================================
-       PROMPT AUDIT
-    ====================================================== */
-
-    const auditPrompt = `
-
-Tu es ARKAS SCAN AI V2 en MODE AUDIT.
-
-L'utilisateur t'envoie une capture d'écran
-qui contient DÉJÀ une analyse de trading.
-
-Cette capture peut contenir :
-
-- BUY
-- SELL
-- WAIT
-- Entry
-- Stop Loss
-- Take Profit
-- flèches
-- lignes
-- rectangles
-- supports
-- résistances
-- Order Blocks
-- FVG
-- BOS
-- CHoCH
-- indicateurs
-- annotations manuelles
-
-==================================================
-OBJECTIF
-==================================================
-
-Tu dois AUDITER l'analyse existante.
-
-IMPORTANT :
-
-L'analyse dessinée par l'utilisateur n'est PAS
-automatiquement correcte.
-
-Tu dois d'abord identifier ce que l'utilisateur
-a proposé, puis vérifier indépendamment si cette
-analyse correspond réellement au graphique.
-
-==================================================
-ÉTAPE 1 — LIRE L'ANALYSE UTILISATEUR
-==================================================
-
-Identifie si possible :
-
-- direction proposée
-- Entry
-- SL
-- TP1
-- TP2
-- TP3
-- zones
-- supports
-- résistances
-- OB
-- FVG
-- BOS
-- CHoCH
-- autres annotations
-
-Si une donnée n'est pas lisible :
-
-utilise null ou UNKNOWN.
-
-Ne l'invente jamais.
-
-==================================================
-ÉTAPE 2 — ANALYSE INDÉPENDANTE
-==================================================
-
-Analyse ensuite le graphique comme un analyste
-professionnel :
-
-- Market Structure
-- Price Action
-- BOS
-- CHoCH
-- Liquidity
-- Order Block
-- FVG
-- Support / Resistance
-- Breakout
-- Retest
 - Momentum
 
-==================================================
-ÉTAPE 3 — COMPARAISON
-==================================================
+Ne considère jamais une information comme certaine
+si elle n'est pas suffisamment visible.
 
-Compare l'analyse utilisateur avec ton analyse.
+============================================================
+SIGNAL
+============================================================
 
-Vérifie notamment :
-
-1. Direction correcte ?
-2. Structure correcte ?
-3. BOS/CHoCH correct ?
-4. Zone correcte ?
-5. Entry correcte ?
-6. SL correctement placé ?
-7. TP cohérents ?
-8. RR acceptable ?
-9. Entrée prématurée ?
-10. Invalidation correcte ?
-
-==================================================
-VERDICTS
-==================================================
-
-Utilise uniquement :
-
-VALIDATED
-
-si l'analyse utilisateur est globalement correcte.
-
-CORRECT
-
-si l'idée est correcte mais nécessite une
-petite correction.
-
-PREMATURE
-
-si la direction/setup est cohérent mais que
-l'entrée est trop tôt et qu'une confirmation
-ou un retest est nécessaire.
-
-INVALID
-
-si la direction ou la logique principale
-est incorrecte.
-
-UNCLEAR
-
-si les annotations sont trop difficiles
-à lire pour réaliser un audit fiable.
-
-==================================================
-IMPORTANT
-==================================================
-
-Même si l'analyse utilisateur indique BUY,
-tu peux conclure SELL ou WAIT.
-
-Même si elle indique SELL,
-tu peux conclure BUY ou WAIT.
-
-Ne cherche pas à confirmer l'utilisateur.
-
-Cherche à vérifier objectivement son analyse.
-
-==================================================
-CORRECTION
-==================================================
-
-Si l'analyse est incorrecte ou prématurée,
-propose une analyse corrigée.
-
-La correction peut être :
+Tu peux retourner exactement l'un des signaux :
 
 BUY NOW
 SELL NOW
@@ -727,7 +181,32 @@ BUY LIMIT
 SELL LIMIT
 WAIT
 
-Avec :
+Règles :
+
+BUY NOW :
+entrée exploitable immédiatement avec confirmation suffisante.
+
+SELL NOW :
+vente exploitable immédiatement avec confirmation suffisante.
+
+BUY LIMIT :
+attente d'un retour sur une zone d'achat précise.
+
+SELL LIMIT :
+attente d'un retour sur une zone de vente précise.
+
+WAIT :
+structure trop incertaine, entrée prématurée ou absence
+de configuration suffisamment claire.
+
+Ne force jamais un BUY ou SELL.
+
+============================================================
+NIVEAUX
+============================================================
+
+Si une configuration est suffisamment claire,
+fournis :
 
 Entry
 SL
@@ -736,86 +215,393 @@ TP2
 TP3
 RR
 
-==================================================
+Les niveaux doivent respecter :
+
+BUY :
+SL < Entry < TP1 < TP2 < TP3
+
+SELL :
+TP3 < TP2 < TP1 < Entry < SL
+
+Si TP3 n'est pas suffisamment déterminable,
+retourne null.
+
+Si les prix ne peuvent pas être lus correctement,
+retourne null plutôt que d'inventer.
+
+============================================================
+STRUCTURE
+============================================================
+
+Détermine si possible :
+
+- tendance haussière
+- tendance baissière
+- range
+- BOS haussier
+- BOS baissier
+- CHoCH haussier
+- CHoCH baissier
+- structure incertaine
+
+============================================================
+LIQUIDITÉ
+============================================================
+
+Recherche notamment :
+
+- equal highs
+- equal lows
+- buy-side liquidity
+- sell-side liquidity
+- liquidity sweep
+- stop hunt potentiel
+
+============================================================
+ORDER BLOCK
+============================================================
+
+Détermine si un Order Block est visible.
+
+Indique :
+
+- bullish
+- bearish
+- zone
+- rôle potentiel
+
+Si aucun OB fiable n'est visible :
+"Non identifié"
+
+============================================================
+FVG
+============================================================
+
+Détermine si un Fair Value Gap est visible.
+
+Si aucun FVG fiable n'est visible :
+"Non identifié"
+
+============================================================
 SCÉNARIOS
-==================================================
+============================================================
 
-Donne aussi :
+Donne :
 
-SI [condition]
-ALORS [action]
+1. scénario principal
+2. scénario alternatif
+3. condition de confirmation
+4. condition d'invalidation
 
-et
+Utilise une logique :
 
-SI [condition inverse]
-ALORS [action]
+SI...
+ALORS...
 
-==================================================
-NEWS
-==================================================
+============================================================
+CONFIANCE
+============================================================
 
-Ne fabrique jamais de news économiques.
+Donne confidence_percent entre 0 et 100.
 
-==================================================
-JSON OBLIGATOIRE
-==================================================
+Ce pourcentage représente la confiance
+dans la qualité de la configuration,
+pas la probabilité garantie de gagner le trade.
 
-Réponds UNIQUEMENT avec JSON valide.
+============================================================
+SCORE ARKAS
+============================================================
 
-Format :
+Donne arkas_score entre 0 et 100.
+
+Répartition indicative :
+
+structure : /20
+liquidité : /15
+OB : /15
+FVG : /10
+price_action : /20
+confirmation : /20
+
+============================================================
+ACTUALITÉ
+============================================================
+
+Tu n'as PAS accès automatiquement aux actualités
+économiques en temps réel.
+
+N'invente donc jamais une actualité.
+
+Si aucune actualité vérifiée n'est disponible :
+"Non disponible — vérifier le calendrier économique."
+
+============================================================
+GESTION DU RISQUE
+============================================================
+
+Donne des recommandations générales :
+
+- risque recommandé
+- rapport risque/rendement
+- prudence
+- taille de position si calculable
+
+Ne présente jamais le résultat comme une garantie
+de profit.
+
+============================================================
+FORMAT DE RÉPONSE
+============================================================
+
+Réponds UNIQUEMENT avec un JSON valide.
+
+Aucun Markdown.
+Aucun texte avant ou après le JSON.
+
+Structure obligatoire :
 
 {
   "asset": "",
   "timeframe": "",
-
   "signal": "BUY NOW|SELL NOW|BUY LIMIT|SELL LIMIT|WAIT",
-  "direction": "BUY|SELL|WAIT",
-  "execution": "MARKET|LIMIT|NONE",
-
+  "direction": "BUY|SELL|WAIT|UNKNOWN",
+  "execution": "",
   "market_bias": "",
-
-  "trade_valid": false,
+  "trade_valid": true,
   "confidence_percent": 0,
-
   "entry": null,
   "sl": null,
   "tp1": null,
   "tp2": null,
   "tp3": null,
   "rr": null,
-
   "arkas_score": 0,
-
-  "structure": {
-    "bos": "",
-    "choch": "",
-    "trend": "",
-    "description": ""
+  "structure": "",
+  "liquidity": "",
+  "order_block": "",
+  "fvg": "",
+  "price_action": "",
+  "score_breakdown": {
+    "structure": 0,
+    "liquidity": 0,
+    "order_block": 0,
+    "fvg": 0,
+    "price_action": 0,
+    "confirmation": 0
   },
-
-  "liquidity": {
-    "type": "",
-    "description": ""
+  "risk_management": {
+    "risk_percent": "",
+    "position_size": "",
+    "recommendation": ""
   },
+  "primary_scenario": "",
+  "alternative_scenario": "",
+  "invalidation": "",
+  "economic_news": "",
+  "reason": "",
+  "risk_warning": ""
+}
 
-  "order_block": {
-    "detected": false,
-    "type": "",
-    "zone": "",
-    "description": ""
-  },
+============================================================
+PROMPT UTILISATEUR
+============================================================
 
-  "fvg": {
-    "detected": false,
-    "type": "",
-    "zone": "",
-    "description": ""
-  },
+${userPrompt}
 
-  "price_action": {
-    "confirmation": "",
-    "description": ""
+`;
+
+
+        // ====================================================
+        // PROMPT AUDIT
+        // ====================================================
+
+        const auditPrompt = `
+
+Tu es ARKAS SCAN AI V2 en MODE AUDIT.
+
+Le graphique peut contenir une analyse déjà réalisée
+par l'utilisateur.
+
+IMPORTANT :
+
+Tu dois distinguer :
+
+1. ce qui est réellement visible sur l'image
+2. ce que l'utilisateur semble avoir conclu
+3. ta propre analyse indépendante
+4. le verdict final
+
+Ne considère JAMAIS une annotation comme correcte
+simplement parce qu'elle apparaît sur le graphique.
+
+============================================================
+ÉTAPE 1 — LIRE L'ANALYSE UTILISATEUR
+============================================================
+
+Cherche visuellement :
+
+- BUY
+- SELL
+- WAIT
+- Entry
+- SL
+- TP
+- flèches
+- lignes
+- supports
+- résistances
+- Order Blocks
+- FVG
+- zones
+- texte
+- indicateurs
+- niveaux de prix
+
+Si une annotation n'est pas lisible,
+retourne null ou "Non lisible".
+
+============================================================
+ÉTAPE 2 — ANALYSE INDÉPENDANTE
+============================================================
+
+Fais ensuite ta propre analyse :
+
+- Market Structure
+- BOS
+- CHoCH
+- Liquidity
+- Order Block
+- FVG
+- Price Action
+- Breakout
+- Retest
+- Momentum
+
+============================================================
+ÉTAPE 3 — COMPARAISON
+============================================================
+
+Compare l'analyse utilisateur
+avec ton analyse indépendante.
+
+Tu dois pouvoir dire :
+
+VALIDATED :
+analyse cohérente et suffisamment confirmée.
+
+CORRECT :
+analyse globalement correcte.
+
+PREMATURE :
+direction/scénario cohérent mais entrée trop précoce.
+
+INVALID :
+analyse contradictoire avec la structure visible.
+
+UNCLEAR :
+image insuffisante pour conclure.
+
+============================================================
+ÉTAPE 4 — CORRECTION
+============================================================
+
+Si l'analyse est incorrecte ou prématurée :
+
+explique clairement :
+
+- ce qui est correct
+- ce qui est incorrect
+- pourquoi
+- quelle correction est préférable
+
+Si nécessaire, propose :
+
+Entry
+SL
+TP1
+TP2
+TP3
+RR
+
+Ne fabrique jamais un prix qui n'est pas
+raisonnablement lisible sur le graphique.
+
+============================================================
+SIGNAL FINAL
+============================================================
+
+Le signal final doit être celui que tu juges
+le plus défendable après ton audit.
+
+Il peut être :
+
+BUY NOW
+SELL NOW
+BUY LIMIT
+SELL LIMIT
+WAIT
+
+============================================================
+ACTUALITÉ
+============================================================
+
+Ne fabrique aucune actualité économique en temps réel.
+
+Si elle n'est pas disponible :
+
+"Non disponible — vérifier le calendrier économique."
+
+============================================================
+FORMAT
+============================================================
+
+Réponds UNIQUEMENT avec un JSON valide.
+
+Aucun Markdown.
+Aucun texte avant ou après.
+
+Structure :
+
+{
+  "asset": "",
+  "timeframe": "",
+  "signal": "",
+  "direction": "",
+  "execution": "",
+  "market_bias": "",
+  "trade_valid": true,
+  "confidence_percent": 0,
+  "entry": null,
+  "sl": null,
+  "tp1": null,
+  "tp2": null,
+  "tp3": null,
+  "rr": null,
+  "arkas_score": 0,
+  "structure": "",
+  "liquidity": "",
+  "order_block": "",
+  "fvg": "",
+  "price_action": "",
+  "score_breakdown": {
+    "structure": 0,
+    "liquidity": 0,
+    "order_block": 0,
+    "fvg": 0,
+    "price_action": 0,
+    "confirmation": 0
   },
+  "risk_management": {
+    "risk_percent": "",
+    "position_size": "",
+    "recommendation": ""
+  },
+  "primary_scenario": "",
+  "alternative_scenario": "",
+  "invalidation": "",
+  "economic_news": "",
+  "reason": "",
+  "risk_warning": "",
 
   "audit": {
     "status": "VALIDATED|CORRECT|PREMATURE|INVALID|UNCLEAR",
@@ -848,148 +634,49 @@ Format :
       "tp3": null,
       "rr": null
     }
-  },
-
-  "score_breakdown": {
-    "structure": 0,
-    "liquidity": 0,
-    "order_block": 0,
-    "fvg": 0,
-    "price_action": 0,
-    "risk_reward": 0
-  },
-
-  "risk_management": {
-    "account_balance": null,
-    "risk_percent": null,
-    "risk_amount": null,
-    "sl_distance": null,
-    "lot": null,
-    "description": ""
-  },
-
-  "primary_scenario": {
-    "condition": "",
-    "action": ""
-  },
-
-  "alternative_scenario": {
-    "condition": "",
-    "action": ""
-  },
-
-  "invalidation": "",
-
-  "economic_news": {
-    "available": false,
-    "impact": "",
-    "description": ""
-  },
-
-  "reason": "",
-  "risk_warning": ""
+  }
 }
 
-==================================================
-RÈGLES
-==================================================
+============================================================
+PARAMÈTRES
+============================================================
 
-Ne fabrique aucune annotation.
+Marché :
+${asset}
 
-Ne fabrique aucun prix.
+Timeframe :
+${timeframe}
 
-Si une annotation est illisible :
-null ou UNKNOWN.
+Prompt :
+${userPrompt}
 
-Si l'analyse utilisateur est mauvaise,
-corrige-la.
-
-Si elle est bonne,
-dis clairement pourquoi.
-
-${riskInformation}
-
-Informations supplémentaires :
-
-${typeof prompt === "string" ? prompt : ""}
-
-Asset fourni :
-${asset || "À déterminer"}
-
-Timeframe fourni :
-${timeframe || "À déterminer"}
-
-Effectue maintenant l'audit de l'image.
 `;
 
-    /* =====================================================
-       PROMPT FINAL
-    ====================================================== */
 
-    const arkasPrompt =
-        analysisMode === "audit"
-            ? auditPrompt
-            : scanPrompt;
+        // ====================================================
+        // CHOIX PROMPT
+        // ====================================================
 
-    /* =====================================================
-       GEMINI
-    ====================================================== */
+        const finalPrompt =
+            mode === "audit"
+                ? auditPrompt
+                : scanPrompt;
 
-    const GEMINI_MODEL =
-        "gemini-3.6-flash";
 
-    const geminiUrl =
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+        // ====================================================
+        // GEMINI
+        // ====================================================
 
-    const requestBody = {
+        const model =
+            "gemini-3.6-flash";
 
-        contents: [
-            {
-                role: "user",
+        const endpoint =
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
-                parts: [
 
-                    {
-                        text: arkasPrompt
-                    },
-
-                    {
-                        inline_data: {
-                            mime_type: finalMimeType,
-                            data: imageBase64
-                        }
-                    }
-
-                ]
-            }
-        ],
-
-        generationConfig: {
-
-            temperature: 0.1,
-
-            topP: 0.8,
-
-            topK: 20,
-
-            maxOutputTokens: 6000,
-
-            responseMimeType:
-                "application/json"
-        }
-    };
-
-    let geminiResponse;
-
-    /* =====================================================
-       APPEL GEMINI
-    ====================================================== */
-
-    try {
-
-        geminiResponse =
+        const geminiResponse =
             await fetch(
-                geminiUrl,
+                endpoint,
                 {
                     method: "POST",
 
@@ -1001,755 +688,874 @@ Effectue maintenant l'audit de l'image.
                             apiKey
                     },
 
-                    body:
-                        JSON.stringify(
-                            requestBody
-                        )
+                    body: JSON.stringify({
+
+                        contents: [
+
+                            {
+                                role: "user",
+
+                                parts: [
+
+                                    {
+                                        text:
+                                            finalPrompt
+                                    },
+
+                                    {
+                                        inline_data: {
+                                            mime_type:
+                                                mimeType,
+
+                                            data:
+                                                imageBase64
+                                        }
+                                    }
+
+                                ]
+
+                            }
+
+                        ],
+
+                        generationConfig: {
+
+                            temperature: 0.15,
+
+                            responseMimeType:
+                                "application/json"
+
+                        }
+
+                    })
+
                 }
             );
+
+
+        // ====================================================
+        // ERREUR GEMINI
+        // ====================================================
+
+        if (
+            !geminiResponse.ok
+        ) {
+
+            const errorText =
+                await geminiResponse.text();
+
+            console.error(
+                "Gemini error:",
+                errorText
+            );
+
+            return res.status(
+                geminiResponse.status
+            ).json({
+
+                error:
+                    "Gemini a refusé ou n'a pas pu traiter la demande.",
+
+                details:
+                    safeGeminiError(
+                        errorText
+                    )
+
+            });
+
+        }
+
+
+        // ====================================================
+        // RÉCUPÉRATION RÉPONSE
+        // ====================================================
+
+        const geminiData =
+            await geminiResponse.json();
+
+
+        const rawText =
+            geminiData
+                ?.candidates?.[0]
+                ?.content?.parts
+                ?.map(
+                    part =>
+                        part.text || ""
+                )
+                .join("")
+                .trim();
+
+
+        if (!rawText) {
+
+            return res.status(502).json({
+                error:
+                    "Gemini n'a retourné aucun résultat exploitable."
+            });
+
+        }
+
+
+        // ====================================================
+        // PARSING JSON
+        // ====================================================
+
+        const parsed =
+            parseJsonSafely(
+                rawText
+            );
+
+
+        if (!parsed) {
+
+            console.error(
+                "Gemini JSON invalide:",
+                rawText
+            );
+
+            return res.status(502).json({
+                error:
+                    "Gemini a retourné un résultat JSON invalide."
+            });
+
+        }
+
+
+        // ====================================================
+        // NORMALISATION
+        // ====================================================
+
+        const result =
+            normalizeResult(
+                parsed,
+                asset,
+                timeframe,
+                mode
+            );
+
+
+        // ====================================================
+        // VALIDATION DES NIVEAUX
+        // ====================================================
+
+        validateTradeLevels(
+            result
+        );
+
+
+        // ====================================================
+        // RÉPONSE
+        // ====================================================
+
+        return res.status(200).json(
+            result
+        );
+
 
     } catch (error) {
 
         console.error(
-            "Erreur réseau Gemini :",
+            "ARKAS API ERROR:",
             error
         );
 
-        return res.status(502).json({
-
-            success: false,
+        return res.status(500).json({
 
             error:
-                "Impossible de contacter Gemini."
+                error.message ||
+                "Erreur interne du serveur."
+
         });
+
     }
 
-    /* =====================================================
-       RÉPONSE GEMINI
-    ====================================================== */
+}
 
-    const geminiData =
-        await geminiResponse
-            .json()
-            .catch(() => null);
 
-    if (!geminiResponse.ok) {
+// ============================================================
+// PARSING JSON ROBUSTE
+// ============================================================
 
-        console.error(
-            "Erreur Gemini :",
-            geminiData
-        );
-
-        const message =
-            geminiData?.error?.message ||
-            "Gemini a refusé ou n'a pas pu traiter l'image.";
-
-        return res.status(
-            geminiResponse.status >= 400 &&
-            geminiResponse.status < 600
-                ? geminiResponse.status
-                : 502
-        ).json({
-
-            success: false,
-
-            error: message
-        });
-    }
-
-    /* =====================================================
-       EXTRACTION TEXTE
-    ====================================================== */
-
-    const text =
-        geminiData
-            ?.candidates?.[0]
-            ?.content?.parts
-            ?.map(
-                part =>
-                    part.text || ""
-            )
-            .join("")
-            .trim();
+function parseJsonSafely(text) {
 
     if (!text) {
-
-        return res.status(502).json({
-
-            success: false,
-
-            error:
-                "Gemini n'a retourné aucune analyse."
-        });
+        return null;
     }
 
-    /* =====================================================
-       PARSE JSON
-    ====================================================== */
-
-    let analysis = null;
-
+    // Premier essai
     try {
 
-        analysis =
-            JSON.parse(text);
-
-    } catch (error) {
-
-        console.error(
-            "JSON Gemini invalide :",
+        return JSON.parse(
             text
         );
 
+    } catch {}
+
+    // Nettoyage éventuel Markdown
+    let cleaned =
+        text
+            .replace(
+                /^```json\s*/i,
+                ""
+            )
+            .replace(
+                /^```\s*/i,
+                ""
+            )
+            .replace(
+                /\s*```$/i,
+                ""
+            )
+            .trim();
+
+    try {
+
+        return JSON.parse(
+            cleaned
+        );
+
+    } catch {}
+
+    // Chercher le premier objet JSON
+    const first =
+        cleaned.indexOf("{");
+
+    const last =
+        cleaned.lastIndexOf("}");
+
+    if (
+        first !== -1 &&
+        last !== -1 &&
+        last > first
+    ) {
+
+        const possibleJson =
+            cleaned.slice(
+                first,
+                last + 1
+            );
+
         try {
 
-            const firstBrace =
-                text.indexOf("{");
-
-            const lastBrace =
-                text.lastIndexOf("}");
-
-            if (
-                firstBrace !== -1 &&
-                lastBrace !== -1 &&
-                lastBrace > firstBrace
-            ) {
-
-                analysis =
-                    JSON.parse(
-                        text.substring(
-                            firstBrace,
-                            lastBrace + 1
-                        )
-                    );
-            }
-
-        } catch (secondError) {
-
-            console.error(
-                "Impossible de récupérer le JSON."
+            return JSON.parse(
+                possibleJson
             );
-        }
+
+        } catch {}
+
     }
 
+    return null;
+
+}
+
+
+// ============================================================
+// NORMALISATION
+// ============================================================
+
+function normalizeResult(
+    data,
+    asset,
+    timeframe,
+    mode
+) {
+
+    const result = {
+
+        asset:
+            data.asset ||
+            asset,
+
+        timeframe:
+            data.timeframe ||
+            timeframe,
+
+        signal:
+            data.signal ||
+            "WAIT",
+
+        direction:
+            data.direction ||
+            inferDirection(
+                data.signal
+            ),
+
+        execution:
+            data.execution ||
+            "",
+
+        market_bias:
+            data.market_bias ||
+            "",
+
+        trade_valid:
+            data.trade_valid !== false,
+
+        confidence_percent:
+            normalizeNumber(
+                data.confidence_percent
+            ),
+
+        entry:
+            normalizeNumber(
+                data.entry
+            ),
+
+        sl:
+            normalizeNumber(
+                data.sl
+            ),
+
+        tp1:
+            normalizeNumber(
+                data.tp1
+            ),
+
+        tp2:
+            normalizeNumber(
+                data.tp2
+            ),
+
+        tp3:
+            normalizeNumber(
+                data.tp3
+            ),
+
+        rr:
+            normalizeNumber(
+                data.rr
+            ),
+
+        arkas_score:
+            normalizeNumber(
+                data.arkas_score
+            ),
+
+        structure:
+            data.structure ||
+            "",
+
+        liquidity:
+            data.liquidity ||
+            "",
+
+        order_block:
+            data.order_block ||
+            "",
+
+        fvg:
+            data.fvg ||
+            "",
+
+        price_action:
+            data.price_action ||
+            "",
+
+        score_breakdown:
+            data.score_breakdown ||
+            {},
+
+        risk_management:
+            data.risk_management ||
+            {},
+
+        primary_scenario:
+            data.primary_scenario ||
+            "",
+
+        alternative_scenario:
+            data.alternative_scenario ||
+            "",
+
+        invalidation:
+            data.invalidation ||
+            "",
+
+        economic_news:
+            data.economic_news ||
+            "Non disponible — vérifier le calendrier économique.",
+
+        reason:
+            data.reason ||
+            "",
+
+        risk_warning:
+            data.risk_warning ||
+            "L'analyse technique ne garantit pas un résultat de trading."
+
+    };
+
+
+    // Audit
     if (
-        !analysis ||
-        typeof analysis !== "object"
+        mode === "audit"
     ) {
 
-        return res.status(502).json({
-
-            success: false,
-
-            error:
-                "La réponse de Gemini n'est pas exploitable."
-        });
-    }
-
-    /* =====================================================
-       HELPERS
-    ====================================================== */
-
-    function toNumber(value) {
-
-        if (
-            value === null ||
-            value === undefined ||
-            value === ""
-        ) {
-            return null;
-        }
-
-        const number =
-            Number(
-                String(value)
-                    .replace(",", ".")
-                    .replace(
-                        /[^0-9.-]/g,
-                        ""
-                    )
+        result.audit =
+            normalizeAudit(
+                data.audit
             );
 
-        return Number.isFinite(number)
-            ? number
-            : null;
     }
 
-    function clampScore(value) {
 
-        const number =
-            toNumber(value);
-
-        if (number === null) {
-            return 0;
-        }
-
-        return Math.max(
+    // Limites
+    result.confidence_percent =
+        clamp(
+            result.confidence_percent,
             0,
-            Math.min(
-                100,
-                Math.round(number)
-            )
+            100
         );
-    }
 
-    function clampConfidence(value) {
-
-        const number =
-            toNumber(value);
-
-        if (number === null) {
-            return 0;
-        }
-
-        return Math.max(
+    result.arkas_score =
+        clamp(
+            result.arkas_score,
             0,
-            Math.min(
-                100,
-                Math.round(number)
-            )
-        );
-    }
-
-    /* =====================================================
-       SIGNAL
-    ====================================================== */
-
-    const validSignals = [
-
-        "BUY NOW",
-        "SELL NOW",
-        "BUY LIMIT",
-        "SELL LIMIT",
-        "WAIT"
-
-    ];
-
-    let signal =
-        String(
-            analysis.signal ||
-            "WAIT"
-        )
-        .trim()
-        .toUpperCase();
-
-    if (
-        !validSignals.includes(signal)
-    ) {
-        signal = "WAIT";
-    }
-
-    analysis.signal =
-        signal;
-
-    if (
-        signal === "BUY NOW" ||
-        signal === "BUY LIMIT"
-    ) {
-
-        analysis.direction =
-            "BUY";
-
-        analysis.execution =
-            signal === "BUY LIMIT"
-                ? "LIMIT"
-                : "MARKET";
-
-    } else if (
-        signal === "SELL NOW" ||
-        signal === "SELL LIMIT"
-    ) {
-
-        analysis.direction =
-            "SELL";
-
-        analysis.execution =
-            signal === "SELL LIMIT"
-                ? "LIMIT"
-                : "MARKET";
-
-    } else {
-
-        analysis.direction =
-            "WAIT";
-
-        analysis.execution =
-            "NONE";
-    }
-
-    /* =====================================================
-       NOMBRES
-    ====================================================== */
-
-    analysis.entry =
-        toNumber(
-            analysis.entry
+            100
         );
 
-    analysis.sl =
-        toNumber(
-            analysis.sl
-        );
 
-    analysis.tp1 =
-        toNumber(
-            analysis.tp1
-        );
+    return result;
 
-    analysis.tp2 =
-        toNumber(
-            analysis.tp2
-        );
+}
 
-    analysis.tp3 =
-        toNumber(
-            analysis.tp3
-        );
 
-    analysis.arkas_score =
-        clampScore(
-            analysis.arkas_score
-        );
+// ============================================================
+// AUDIT
+// ============================================================
 
-    analysis.confidence_percent =
-        clampConfidence(
-            analysis.confidence_percent
-        );
+function normalizeAudit(
+    audit
+) {
 
-    /* =====================================================
-       RR
-    ====================================================== */
+    audit =
+        audit || {};
 
-    let calculatedRR = null;
-
-    if (
-        analysis.entry !== null &&
-        analysis.sl !== null &&
-        analysis.tp2 !== null
-    ) {
-
-        const riskDistance =
-            Math.abs(
-                analysis.entry -
-                analysis.sl
-            );
-
-        const rewardDistance =
-            Math.abs(
-                analysis.tp2 -
-                analysis.entry
-            );
-
-        if (
-            riskDistance > 0
-        ) {
-
-            calculatedRR =
-                Number(
-                    (
-                        rewardDistance /
-                        riskDistance
-                    ).toFixed(2)
-                );
-        }
-    }
-
-    analysis.rr =
-        calculatedRR;
-
-    /* =====================================================
-       VALIDATION TRADE
-    ====================================================== */
-
-    let tradeValid =
-        false;
-
-    if (
-        analysis.direction === "BUY"
-    ) {
-
-        tradeValid =
-            analysis.entry !== null &&
-            analysis.sl !== null &&
-            analysis.tp1 !== null &&
-            analysis.tp2 !== null &&
-            analysis.sl <
-                analysis.entry &&
-            analysis.entry <
-                analysis.tp1 &&
-            analysis.tp1 <
-                analysis.tp2 &&
-            (
-                analysis.tp3 === null ||
-                analysis.tp2 <
-                    analysis.tp3
-            );
-    }
-
-    if (
-        analysis.direction === "SELL"
-    ) {
-
-        tradeValid =
-            analysis.entry !== null &&
-            analysis.sl !== null &&
-            analysis.tp1 !== null &&
-            analysis.tp2 !== null &&
-            analysis.tp2 <
-                analysis.tp1 &&
-            analysis.tp1 <
-                analysis.entry &&
-            analysis.entry <
-                analysis.sl &&
-            (
-                analysis.tp3 === null ||
-                analysis.tp3 <
-                    analysis.tp2
-            );
-    }
-
-    /* =====================================================
-       WAIT UNIQUEMENT SI NIVEAUX VRAIMENT INCOHÉRENTS
-    ====================================================== */
-
-    if (
-        analysis.signal !== "WAIT" &&
-        !tradeValid
-    ) {
-
-        console.warn(
-            "Trade incohérent : passage en WAIT."
-        );
-
-        analysis.signal =
-            "WAIT";
-
-        analysis.direction =
-            "WAIT";
-
-        analysis.execution =
-            "NONE";
-
-        tradeValid =
-            false;
-    }
-
-    analysis.trade_valid =
-        tradeValid;
-
-    /* =====================================================
-       RISK MANAGEMENT
-    ====================================================== */
-
-    const riskManagement =
-        analysis.risk_management ||
+    const detected =
+        audit.detected_user_analysis ||
         {};
 
-    riskManagement.account_balance =
-        Number.isFinite(balance) &&
-        balance > 0
-            ? balance
-            : null;
+    const corrected =
+        audit.corrected_trade ||
+        {};
 
-    riskManagement.risk_percent =
-        Number.isFinite(risk) &&
-        risk > 0
-            ? risk
-            : null;
+    return {
 
-    if (
-        Number.isFinite(balance) &&
-        balance > 0 &&
-        Number.isFinite(risk) &&
-        risk > 0
-    ) {
-
-        riskManagement.risk_amount =
-            Number(
-                (
-                    balance *
-                    risk /
-                    100
-                ).toFixed(2)
-            );
-
-    } else {
-
-        riskManagement.risk_amount =
-            null;
-    }
-
-    if (
-        analysis.entry !== null &&
-        analysis.sl !== null
-    ) {
-
-        riskManagement.sl_distance =
-            Number(
-                Math.abs(
-                    analysis.entry -
-                    analysis.sl
-                ).toFixed(8)
-            );
-
-    } else {
-
-        riskManagement.sl_distance =
-            null;
-    }
-
-    if (
-        riskManagement.risk_amount !== null &&
-        riskManagement.sl_distance !== null &&
-        riskManagement.sl_distance > 0 &&
-        Number.isFinite(valueLot) &&
-        valueLot > 0
-    ) {
-
-        riskManagement.lot =
-            Number(
-                (
-                    riskManagement.risk_amount /
-                    (
-                        riskManagement.sl_distance *
-                        valueLot
-                    )
-                ).toFixed(4)
-            );
-
-    } else {
-
-        riskManagement.lot =
-            null;
-    }
-
-    analysis.risk_management =
-        riskManagement;
-
-    /* =====================================================
-       STRUCTURES PAR DÉFAUT
-    ====================================================== */
-
-    analysis.structure =
-        analysis.structure ||
-        {
-            bos: "",
-            choch: "",
-            trend: "",
-            description: ""
-        };
-
-    analysis.liquidity =
-        analysis.liquidity ||
-        {
-            type: "",
-            description: ""
-        };
-
-    analysis.order_block =
-        analysis.order_block ||
-        {
-            detected: false,
-            type: "",
-            zone: "",
-            description: ""
-        };
-
-    analysis.fvg =
-        analysis.fvg ||
-        {
-            detected: false,
-            type: "",
-            zone: "",
-            description: ""
-        };
-
-    analysis.price_action =
-        analysis.price_action ||
-        {
-            confirmation: "",
-            description: ""
-        };
-
-    analysis.score_breakdown =
-        analysis.score_breakdown ||
-        {
-            structure: 0,
-            liquidity: 0,
-            order_block: 0,
-            fvg: 0,
-            price_action: 0,
-            risk_reward: 0
-        };
-
-    analysis.primary_scenario =
-        analysis.primary_scenario ||
-        {
-            condition: "",
-            action: ""
-        };
-
-    analysis.alternative_scenario =
-        analysis.alternative_scenario ||
-        {
-            condition: "",
-            action: ""
-        };
-
-    analysis.invalidation =
-        analysis.invalidation ||
-        "";
-
-    analysis.economic_news =
-        analysis.economic_news ||
-        {
-            available: false,
-            impact: "",
-            description:
-                "Aucune donnée économique en temps réel fournie."
-        };
-
-    analysis.reason =
-        analysis.reason ||
-        "Analyse basée sur les éléments visibles du graphique.";
-
-    analysis.risk_warning =
-        analysis.risk_warning ||
-        "Une analyse technique n'offre aucune garantie de résultat.";
-
-    /* =====================================================
-       AUDIT PAR DÉFAUT
-    ====================================================== */
-
-    if (analysisMode === "audit") {
-
-        analysis.audit =
-            analysis.audit ||
-            {
-                status: "UNCLEAR",
-
-                detected_user_analysis: {
-                    direction: "UNKNOWN",
-                    entry: null,
-                    sl: null,
-                    tp1: null,
-                    tp2: null,
-                    tp3: null,
-                    annotations: [],
-                    claimed_setup: ""
-                },
-
-                verdict: "",
-                strengths: [],
-                errors: [],
-                corrections: [],
-
-                corrected_trade: {
-                    signal: "WAIT",
-                    entry: null,
-                    sl: null,
-                    tp1: null,
-                    tp2: null,
-                    tp3: null,
-                    rr: null
-                }
-            };
-
-        const audit =
-            analysis.audit;
-
-        const statuses = [
-            "VALIDATED",
-            "CORRECT",
-            "PREMATURE",
-            "INVALID",
-            "UNCLEAR"
-        ];
-
-        if (
-            !statuses.includes(
+        status:
+            normalizeAuditStatus(
                 audit.status
-            )
-        ) {
-            audit.status =
-                "UNCLEAR";
-        }
+            ),
 
-        audit.detected_user_analysis =
-            audit.detected_user_analysis ||
-            {
-                direction: "UNKNOWN",
-                entry: null,
-                sl: null,
-                tp1: null,
-                tp2: null,
-                tp3: null,
-                annotations: [],
-                claimed_setup: ""
-            };
+        detected_user_analysis: {
 
-        audit.corrected_trade =
-            audit.corrected_trade ||
-            {
-                signal:
-                    analysis.signal ||
-                    "WAIT",
-                entry:
-                    analysis.entry,
-                sl:
-                    analysis.sl,
-                tp1:
-                    analysis.tp1,
-                tp2:
-                    analysis.tp2,
-                tp3:
-                    analysis.tp3,
-                rr:
-                    analysis.rr
-            };
+            direction:
+                detected.direction ||
+                "UNKNOWN",
 
-        audit.strengths =
+            entry:
+                normalizeNumber(
+                    detected.entry
+                ),
+
+            sl:
+                normalizeNumber(
+                    detected.sl
+                ),
+
+            tp1:
+                normalizeNumber(
+                    detected.tp1
+                ),
+
+            tp2:
+                normalizeNumber(
+                    detected.tp2
+                ),
+
+            tp3:
+                normalizeNumber(
+                    detected.tp3
+                ),
+
+            annotations:
+                Array.isArray(
+                    detected.annotations
+                )
+                    ? detected.annotations
+                    : [],
+
+            claimed_setup:
+                detected.claimed_setup ||
+                ""
+
+        },
+
+        verdict:
+            audit.verdict ||
+            "",
+
+        strengths:
             Array.isArray(
                 audit.strengths
             )
                 ? audit.strengths
-                : [];
+                : [],
 
-        audit.errors =
+        errors:
             Array.isArray(
                 audit.errors
             )
                 ? audit.errors
-                : [];
+                : [],
 
-        audit.corrections =
+        corrections:
             Array.isArray(
                 audit.corrections
             )
                 ? audit.corrections
-                : [];
+                : [],
 
-        analysis.audit =
-            audit;
+        corrected_trade: {
+
+            signal:
+                corrected.signal ||
+                "WAIT",
+
+            entry:
+                normalizeNumber(
+                    corrected.entry
+                ),
+
+            sl:
+                normalizeNumber(
+                    corrected.sl
+                ),
+
+            tp1:
+                normalizeNumber(
+                    corrected.tp1
+                ),
+
+            tp2:
+                normalizeNumber(
+                    corrected.tp2
+                ),
+
+            tp3:
+                normalizeNumber(
+                    corrected.tp3
+                ),
+
+            rr:
+                normalizeNumber(
+                    corrected.rr
+                )
+
+        }
+
+    };
+
+}
+
+
+// ============================================================
+// VALIDATION TRADE
+// ============================================================
+
+function validateTradeLevels(
+    result
+) {
+
+    const direction =
+        String(
+            result.direction || ""
+        ).toUpperCase();
+
+    const entry =
+        result.entry;
+
+    const sl =
+        result.sl;
+
+    const tp1 =
+        result.tp1;
+
+    const tp2 =
+        result.tp2;
+
+    const tp3 =
+        result.tp3;
+
+
+    // WAIT ne nécessite pas de niveaux
+    if (
+        direction === "WAIT" ||
+        result.signal === "WAIT"
+    ) {
+
+        result.trade_valid = true;
+
+        return;
+
     }
 
-    /* =====================================================
-       RÉPONSE
-    ====================================================== */
 
-    return res.status(200).json({
+    // Si niveaux incomplets
+    if (
+        !isFiniteNumber(entry) ||
+        !isFiniteNumber(sl) ||
+        !isFiniteNumber(tp1) ||
+        !isFiniteNumber(tp2)
+    ) {
 
-        success: true,
+        result.trade_valid = false;
 
-        engine:
-            "ARKAS SCAN AI V2",
+        return;
 
-        model:
-            GEMINI_MODEL,
+    }
 
-        mode:
-            analysisMode,
 
-        analysis
-    });
+    // BUY
+    if (
+        direction === "BUY"
+    ) {
+
+        const valid =
+            sl < entry &&
+            entry < tp1 &&
+            tp1 < tp2 &&
+            (
+                tp3 === null ||
+                tp3 > tp2
+            );
+
+        if (!valid) {
+
+            result.trade_valid = false;
+
+            result.risk_warning =
+                "Les niveaux BUY fournis ne respectent pas une structure Entry/SL/TP valide.";
+
+        }
+
+        return;
+
+    }
+
+
+    // SELL
+    if (
+        direction === "SELL"
+    ) {
+
+        const valid =
+            tp2 < tp1 &&
+            tp1 < entry &&
+            sl > entry &&
+            (
+                tp3 === null ||
+                tp3 < tp2
+            );
+
+        if (!valid) {
+
+            result.trade_valid = false;
+
+            result.risk_warning =
+                "Les niveaux SELL fournis ne respectent pas une structure Entry/SL/TP valide.";
+
+        }
+
+        return;
+
+    }
+
+}
+
+
+// ============================================================
+// DIRECTION
+// ============================================================
+
+function inferDirection(
+    signal
+) {
+
+    const value =
+        String(
+            signal || ""
+        ).toUpperCase();
+
+    if (
+        value.includes("BUY")
+    ) {
+
+        return "BUY";
+
+    }
+
+    if (
+        value.includes("SELL")
+    ) {
+
+        return "SELL";
+
+    }
+
+    return "WAIT";
+
+}
+
+
+// ============================================================
+// AUDIT STATUS
+// ============================================================
+
+function normalizeAuditStatus(
+    status
+) {
+
+    const allowed = [
+        "VALIDATED",
+        "CORRECT",
+        "PREMATURE",
+        "INVALID",
+        "UNCLEAR"
+    ];
+
+    const value =
+        String(
+            status || "UNCLEAR"
+        ).toUpperCase();
+
+    return allowed.includes(
+        value
+    )
+        ? value
+        : "UNCLEAR";
+
+}
+
+
+// ============================================================
+// NUMBER
+// ============================================================
+
+function normalizeNumber(
+    value
+) {
+
+    if (
+        value === null ||
+        value === undefined ||
+        value === ""
+    ) {
+
+        return null;
+
+    }
+
+    if (
+        typeof value === "number" &&
+        Number.isFinite(value)
+    ) {
+
+        return value;
+
+    }
+
+    const normalized =
+        Number(
+            String(value)
+                .replace(
+                    ",",
+                    "."
+                )
+                .replace(
+                    /[^0-9eE.+-]/g,
+                    ""
+                )
+        );
+
+    return Number.isFinite(
+        normalized
+    )
+        ? normalized
+        : null;
+
+}
+
+
+// ============================================================
+// NUMBER CHECK
+// ============================================================
+
+function isFiniteNumber(
+    value
+) {
+
+    return (
+        typeof value === "number" &&
+        Number.isFinite(value)
+    );
+
+}
+
+
+// ============================================================
+// CLAMP
+// ============================================================
+
+function clamp(
+    value,
+    min,
+    max
+) {
+
+    if (
+        !isFiniteNumber(value)
+    ) {
+
+        return 0;
+
+    }
+
+    return Math.min(
+        Math.max(
+            value,
+            min
+        ),
+        max
+    );
+
+}
+
+
+// ============================================================
+// GEMINI ERROR SAFE
+// ============================================================
+
+function safeGeminiError(
+    text
+) {
+
+    try {
+
+        const parsed =
+            JSON.parse(
+                text
+            );
+
+        return (
+            parsed?.error?.message ||
+            "Erreur Gemini."
+        );
+
+    } catch {
+
+        return "Erreur Gemini.";
+
+    }
+
 }

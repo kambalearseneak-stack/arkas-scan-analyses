@@ -12,13 +12,137 @@
     >
 
     <link rel="stylesheet" href="style.css">
+
+    <style>
+        /* ================= SCANNER CONTROLS ================= */
+
+        .scanner-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .scanner-control label {
+            display: block;
+            margin-bottom: 7px;
+            font-size: 13px;
+            opacity: .75;
+        }
+
+        .scanner-control select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            background: #101b2d;
+            color: #fff;
+            border: 1px solid rgba(255,255,255,.15);
+            outline: none;
+        }
+
+        .scanner-control select:focus {
+            border-color: rgba(0,255,150,.6);
+        }
+
+        /* ================= ACTION BUTTONS ================= */
+
+        .preview-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .preview-actions button {
+            min-height: 52px;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        #analyze-btn {
+            min-width: 0;
+        }
+
+        #auditBtn {
+            min-width: 0;
+        }
+
+        #analyze-btn:disabled,
+        #auditBtn:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+        }
+
+        #analyze-btn:not(:disabled),
+        #auditBtn:not(:disabled) {
+            cursor: pointer;
+        }
+
+        /* ================= PREVIEW ================= */
+
+        .preview-container.hidden {
+            display: none;
+        }
+
+        .preview-container {
+            margin-top: 20px;
+        }
+
+        .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .preview-image-wrapper {
+            width: 100%;
+            overflow: hidden;
+            border-radius: 14px;
+        }
+
+        #image-preview {
+            display: block;
+            width: 100%;
+            max-height: 600px;
+            object-fit: contain;
+            border-radius: 14px;
+        }
+
+        /* ================= STATUS ================= */
+
+        .scanner-status {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 13px;
+            opacity: .75;
+        }
+
+        /* ================= RESPONSIVE ================= */
+
+        @media (max-width: 700px) {
+
+            .scanner-controls {
+                grid-template-columns: 1fr;
+            }
+
+            .preview-actions {
+                grid-template-columns: 1fr;
+            }
+
+        }
+    </style>
 </head>
 
 <body class="dashboard-body">
 
     <div class="bg-overlay"></div>
 
-    <!-- ================= NAVBAR ================= -->
+    <!-- =====================================================
+         NAVBAR
+    ====================================================== -->
 
     <header class="navbar">
 
@@ -50,12 +174,16 @@
     </header>
 
 
-    <!-- ================= CONTENU ================= -->
+    <!-- =====================================================
+         CONTENU
+    ====================================================== -->
 
     <main class="dashboard-container">
 
 
-        <!-- ================= SCANNER ================= -->
+        <!-- =================================================
+             SCANNER
+        ================================================== -->
 
         <section class="card upload-section">
 
@@ -81,7 +209,141 @@
             </div>
 
 
-            <!-- ZONE IMPORT -->
+            <!-- =================================================
+                 MARCHÉ + TIMEFRAME
+            ================================================== -->
+
+            <div class="scanner-controls">
+
+                <!-- MARCHÉ -->
+
+                <div class="scanner-control">
+
+                    <label for="assetSelect">
+                        MARCHÉ
+                    </label>
+
+                    <select
+                        id="assetSelect"
+                        name="asset"
+                    >
+
+                        <option value="AUTO">
+                            Détection automatique
+                        </option>
+
+                        <option value="XAUUSD">
+                            Gold / XAUUSD
+                        </option>
+
+                        <option value="BTCUSD">
+                            Bitcoin / BTCUSD
+                        </option>
+
+                        <option value="ETHUSD">
+                            Ethereum / ETHUSD
+                        </option>
+
+                        <option value="EURUSD">
+                            EUR/USD
+                        </option>
+
+                        <option value="GBPUSD">
+                            GBP/USD
+                        </option>
+
+                        <option value="USDJPY">
+                            USD/JPY
+                        </option>
+
+                        <option value="AUDUSD">
+                            AUD/USD
+                        </option>
+
+                        <option value="USDCAD">
+                            USD/CAD
+                        </option>
+
+                        <option value="USDCHF">
+                            USD/CHF
+                        </option>
+
+                        <option value="NAS100">
+                            NAS100
+                        </option>
+
+                        <option value="US30">
+                            US30
+                        </option>
+
+                        <option value="SPX500">
+                            S&P 500
+                        </option>
+
+                        <option value="OTHER">
+                            Autre
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <!-- TIMEFRAME -->
+
+                <div class="scanner-control">
+
+                    <label for="timeframeSelect">
+                        TIMEFRAME
+                    </label>
+
+                    <select
+                        id="timeframeSelect"
+                        name="timeframe"
+                    >
+
+                        <option value="AUTO">
+                            Détection automatique
+                        </option>
+
+                        <option value="M1">
+                            M1
+                        </option>
+
+                        <option value="M5">
+                            M5
+                        </option>
+
+                        <option value="M15">
+                            M15
+                        </option>
+
+                        <option value="M30">
+                            M30
+                        </option>
+
+                        <option value="H1">
+                            H1
+                        </option>
+
+                        <option value="H4">
+                            H4
+                        </option>
+
+                        <option value="D1">
+                            D1
+                        </option>
+
+                    </select>
+
+                </div>
+
+            </div>
+
+
+            <!-- =================================================
+                 ZONE IMPORT
+            ================================================== -->
 
             <div
                 class="drop-zone"
@@ -128,7 +390,9 @@
             </div>
 
 
-            <!-- ================= APERÇU ================= -->
+            <!-- =================================================
+                 APERÇU
+            ================================================== -->
 
             <div
                 id="preview-container"
@@ -159,96 +423,53 @@
                 </div>
 
 
-                <!-- BOUTON SCANNER -->
+                <!-- =================================================
+                     BOUTONS
+                ================================================== -->
 
-                <div
-                    class="preview-actions"
-                    style="
-                        display:flex;
-                        justify-content:center;
-                        align-items:center;
-                        margin-top:20px;
-                    "
-                >
+                <div class="preview-actions">
+
+                    <!-- ANALYSE AUTONOME -->
 
                     <button
                         id="analyze-btn"
                         class="btn-primary"
                         type="button"
                         disabled
-                        style="
-                            min-width:260px;
-                            min-height:52px;
-                            font-size:16px;
-                            font-weight:700;
-                            cursor:pointer;
-                        "
                     >
-                        🔍 LANCER LE SCAN
+                        🔍 ANALYSER LE GRAPHIQUE
+                    </button>
+
+
+                    <!-- AUDIT -->
+
+                    <button
+                        id="auditBtn"
+                        class="btn-secondary"
+                        type="button"
+                        disabled
+                    >
+                        🧪 VÉRIFIER MON ANALYSE
                     </button>
 
                 </div>
 
+
                 <p
                     id="scan-help"
-                    style="
-                        text-align:center;
-                        margin-top:10px;
-                        opacity:.7;
-                        font-size:13px;
-                    "
+                    class="scanner-status"
                 >
                     Sélectionnez d'abord un graphique.
                 </p>
 
             </div>
 
-
-            <!-- ================= ACTION RAPIDE ================= -->
-
-            <div
-                class="scanner-action"
-                style="
-                    margin-top:20px;
-                    padding:18px;
-                    border-radius:14px;
-                    text-align:center;
-                    background:rgba(0,255,150,.05);
-                    border:1px solid rgba(0,255,150,.15);
-                "
-            >
-
-                <div
-                    style="
-                        font-size:13px;
-                        opacity:.75;
-                        margin-bottom:10px;
-                    "
-                >
-                    🚀 PRÊT POUR L'ANALYSE ?
-                </div>
-
-                <button
-                    id="scan-main-btn"
-                    class="btn-primary"
-                    type="button"
-                    disabled
-                    style="
-                        min-width:260px;
-                        min-height:50px;
-                        font-size:16px;
-                        font-weight:700;
-                    "
-                >
-                    🔎 SCANNER LE GRAPHIQUE
-                </button>
-
-            </div>
-
         </section>
 
 
-        <!-- ================= RESULTATS ================= -->
+        <!-- =================================================
+             RESULTATS
+        ================================================== -->
 
         <section class="card results-section">
 
@@ -292,26 +513,63 @@
                     </h4>
 
                     <p>
-                        Importez un graphique puis cliquez sur
-                        <strong>
-                            "LANCER LE SCAN"
-                        </strong>
-                        pour obtenir :
+                        Importez un graphique puis choisissez
+                        une action :
                     </p>
 
                     <ul class="analysis-list">
 
-                        <li>Direction BUY / SELL / WAIT</li>
-                        <li>Score ARKAS /100</li>
-                        <li>Entry</li>
-                        <li>Stop Loss</li>
-                        <li>Take Profit 1 / 2</li>
-                        <li>Risk / Reward</li>
-                        <li>BOS / CHoCH</li>
-                        <li>Order Block</li>
-                        <li>Fair Value Gap</li>
-                        <li>Liquidité</li>
-                        <li>Price Action</li>
+                        <li>
+                            🔍 Analyser le graphique
+                        </li>
+
+                        <li>
+                            🧪 Vérifier mon analyse
+                        </li>
+
+                        <li>
+                            Direction BUY / SELL / WAIT
+                        </li>
+
+                        <li>
+                            Score ARKAS /100
+                        </li>
+
+                        <li>
+                            Entry
+                        </li>
+
+                        <li>
+                            Stop Loss
+                        </li>
+
+                        <li>
+                            Take Profit 1 / 2 / 3
+                        </li>
+
+                        <li>
+                            Risk / Reward
+                        </li>
+
+                        <li>
+                            BOS / CHoCH
+                        </li>
+
+                        <li>
+                            Order Block
+                        </li>
+
+                        <li>
+                            Fair Value Gap
+                        </li>
+
+                        <li>
+                            Liquidité
+                        </li>
+
+                        <li>
+                            Price Action
+                        </li>
 
                     </ul>
 
@@ -322,7 +580,9 @@
         </section>
 
 
-        <!-- ================= METHODE ================= -->
+        <!-- =================================================
+             METHODE
+        ================================================== -->
 
         <section class="card method-section">
 
@@ -331,6 +591,9 @@
             </h3>
 
             <div class="method-grid">
+
+
+                <!-- 01 -->
 
                 <div class="method-item">
 
@@ -350,6 +613,8 @@
                 </div>
 
 
+                <!-- 02 -->
+
                 <div class="method-item">
 
                     <div class="method-icon">
@@ -368,6 +633,8 @@
                 </div>
 
 
+                <!-- 03 -->
+
                 <div class="method-item">
 
                     <div class="method-icon">
@@ -385,6 +652,8 @@
 
                 </div>
 
+
+                <!-- 04 -->
 
                 <div class="method-item">
 
@@ -408,7 +677,9 @@
         </section>
 
 
-        <!-- ================= AVERTISSEMENT ================= -->
+        <!-- =================================================
+             AVERTISSEMENT
+        ================================================== -->
 
         <section class="risk-notice">
 
@@ -430,7 +701,9 @@
     </main>
 
 
-    <!-- ================= SCRIPTS ================= -->
+    <!-- =====================================================
+         SCRIPTS
+    ====================================================== -->
 
     <script
         type="module"
@@ -441,110 +714,6 @@
         type="module"
         src="dashboard.js"
     ></script>
-
-
-    <!-- ================= ACTIVATION DU BOUTON ================= -->
-
-    <script>
-
-        document.addEventListener("DOMContentLoaded", () => {
-
-            const fileInput =
-                document.getElementById("chart-file");
-
-            const analyzeBtn =
-                document.getElementById("analyze-btn");
-
-            const scanMainBtn =
-                document.getElementById("scan-main-btn");
-
-            const previewContainer =
-                document.getElementById("preview-container");
-
-            const scanHelp =
-                document.getElementById("scan-help");
-
-
-            function updateScanButtons() {
-
-                const hasImage =
-                    fileInput &&
-                    fileInput.files &&
-                    fileInput.files.length > 0;
-
-
-                if (analyzeBtn) {
-
-                    analyzeBtn.disabled = !hasImage;
-
-                    analyzeBtn.style.opacity =
-                        hasImage ? "1" : ".5";
-
-                }
-
-
-                if (scanMainBtn) {
-
-                    scanMainBtn.disabled = !hasImage;
-
-                    scanMainBtn.style.opacity =
-                        hasImage ? "1" : ".5";
-
-                }
-
-
-                if (scanHelp) {
-
-                    scanHelp.textContent = hasImage
-                        ? "Graphique prêt. Cliquez sur SCANNER pour lancer l'analyse."
-                        : "Sélectionnez d'abord un graphique.";
-
-                }
-
-            }
-
-
-            if (fileInput) {
-
-                fileInput.addEventListener(
-                    "change",
-                    updateScanButtons
-                );
-
-            }
-
-
-            /*
-             * Le bouton principal déclenche
-             * le même bouton utilisé par dashboard.js.
-             */
-
-            if (scanMainBtn) {
-
-                scanMainBtn.addEventListener(
-                    "click",
-                    () => {
-
-                        if (
-                            analyzeBtn &&
-                            !analyzeBtn.disabled
-                        ) {
-
-                            analyzeBtn.click();
-
-                        }
-
-                    }
-                );
-
-            }
-
-
-            updateScanButtons();
-
-        });
-
-    </script>
 
 </body>
 </html>

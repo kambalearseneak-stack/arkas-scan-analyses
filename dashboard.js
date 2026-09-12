@@ -1,6 +1,6 @@
 /* =========================================================
    ARKAS SCAN AI V2 — DASHBOARD
-   Scanner + Audit + Détection auto + Stratégie adaptative
+   Scanner + Audit + Détection auto + Scénarios multiples
    ========================================================= */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -29,6 +29,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const resultsSection = document.getElementById("results-section");
     const resultsContent = document.getElementById("results-content");
+
+    const globalLoader = document.getElementById("global-loader");
 
     let selectedFile = null;
     let selectedBase64 = null;
@@ -96,10 +98,54 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /* =========================================================
+       COMPRESSION IMAGE (limite Vercel 4.5 Mo)
+       ========================================================= */
+
+    function compressImage(file, maxWidth = 1600, quality = 0.85) {
+
+        return new Promise((resolve, reject) => {
+
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+
+            img.onload = () => {
+
+                URL.revokeObjectURL(url);
+
+                let { width, height } = img;
+
+                if (width > maxWidth) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                }
+
+                const canvas = document.createElement("canvas");
+                canvas.width = width;
+                canvas.height = height;
+
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, width, height);
+
+                canvas.toBlob(
+                    (blob) => {
+                        if (!blob) return reject(new Error("Compression échouée"));
+                        resolve(blob);
+                    },
+                    "image/jpeg",
+                    quality
+                );
+            };
+
+            img.onerror = () => reject(new Error("Lecture image échouée"));
+            img.src = url;
+        });
+    }
+
+    /* =========================================================
        GESTION DU FICHIER
        ========================================================= */
 
-    function handleFile(file) {
+    async function handleFile(file) {
 
         if (!file) return;
 
@@ -119,52 +165,60 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         selectedFile = file;
-        selectedMimeType = file.type;
+        selectedMimeType = "image/jpeg"; // après compression
 
         showStatus("📷 Capture importée. Préparation du scanner…", "info");
 
-        const reader = new FileReader();
+        try {
+            const compressedBlob = await compressImage(file);
 
-        reader.onload = (event) => {
+            const reader = new FileReader();
 
-            selectedBase64 = event.target.result;
+            reader.onload = (event) => {
 
-            if (imagePreview) {
-                imagePreview.src = selectedBase64;
-                imagePreview.style.display = "block";
-            }
+                selectedBase64 = event.target.result;
 
-            if (fileName) fileName.textContent = file.name;
-            if (previewContainer) previewContainer.style.display = "block";
-            if (detectedInfo) detectedInfo.style.display = "block";
+                if (imagePreview) {
+                    imagePreview.src = selectedBase64;
+                    imagePreview.style.display = "block";
+                }
 
-            if (detectedAsset) detectedAsset.textContent = "Détection automatique…";
-            if (detectedTimeframe) detectedTimeframe.textContent = "Détection automatique…";
+                if (fileName) fileName.textContent = file.name;
+                if (previewContainer) previewContainer.style.display = "block";
+                if (detectedInfo) detectedInfo.style.display = "block";
 
-            if (scannerActions) scannerActions.style.display = "flex";
-            if (resultsSection) resultsSection.style.display = "none";
+                if (detectedAsset) detectedAsset.textContent = "Détection automatique…";
+                if (detectedTimeframe) detectedTimeframe.textContent = "Détection automatique…";
 
-            setupScanOverlay();
+                if (scannerActions) scannerActions.style.display = "flex";
+                if (resultsSection) resultsSection.style.display = "none";
 
-            showStatus("✅ Capture prête. Choisis SCANNER ou AUDITER.", "success");
+                setupScanOverlay();
 
-            if (scannerActions) {
-                setTimeout(() => {
-                    scannerActions.scrollIntoView({
-                        behavior: "smooth",
-                        block: "nearest"
-                    });
-                }, 100);
-            }
+                showStatus("✅ Capture prête. Choisis SCANNER ou AUDITER.", "success");
 
-            if (fileInput) fileInput.value = "";
-        };
+                if (scannerActions) {
+                    setTimeout(() => {
+                        scannerActions.scrollIntoView({
+                            behavior: "smooth",
+                            block: "nearest"
+                        });
+                    }, 100);
+                }
 
-        reader.onerror = () => {
-            showStatus("❌ Impossible de lire cette image.", "error");
-        };
+                if (fileInput) fileInput.value = "";
+            };
 
-        reader.readAsDataURL(file);
+            reader.onerror = () => {
+                showStatus("❌ Impossible de lire cette image.", "error");
+            };
+
+            reader.readAsDataURL(compressedBlob);
+
+        } catch (err) {
+            console.error("Compression error:", err);
+            showStatus("❌ Impossible de traiter cette image.", "error");
+        }
     }
 
     /* =========================================================
@@ -274,6 +328,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (resultsSection) resultsSection.style.display = "none";
 
+        if (globalLoader) globalLoader.classList.remove("hidden");
+
         startScanAnimation(mode);
 
         showStatus(
@@ -286,8 +342,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const cleanBase64 = selectedBase64.includes(",")
             ? selectedBase64.split(",")[1]
             : selectedBase64;
-
-        const prompt = ""; // Le prompt est généré côté serveur
 
         try {
 
@@ -304,7 +358,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     asset: "AUTO",
                     timeframe: "AUTO",
                     mode,
-                    prompt
+                    prompt: ""
                 })
             });
 
@@ -349,6 +403,7 @@ document.addEventListener("DOMContentLoaded", () => {
             stopScanAnimation();
 
         } finally {
+            if (globalLoader) globalLoader.classList.add("hidden");
             isProcessing = false;
             setButtonsDisabled(false);
         }
@@ -409,16 +464,13 @@ document.addEventListener("DOMContentLoaded", () => {
         const direction = safe(data.direction, "—");
         const signalClass = getSignalClass(signal);
 
-        /* Badge stratégie */
         const strategyInfo = getStrategyInfo(data);
         const marketInfo = getMarketInfo(data);
 
-        /* Confluence Forex */
         const confluenceHtml = data.confluence_status
             ? renderConfluence(data.confluence_status)
             : "";
 
-        /* Détails SMC (uniquement si SMC ou SMC+PA) */
         const smcDetails = (
             data.strategy_applied === "SMC" ||
             data.strategy_applied === "SMC_PA_HYBRID"
@@ -428,7 +480,6 @@ document.addEventListener("DOMContentLoaded", () => {
             ${detailBlock("📉 FVG", safe(data.fvg, "—"))}
         ` : "";
 
-        /* Détails Price Action */
         const paDetails = `
             ${detailBlock("📏 Supports / Résistances", safe(data.supports_resistances, "—"))}
             ${detailBlock("📐 Trendlines", safe(data.trendlines, "—"))}
@@ -437,13 +488,25 @@ document.addEventListener("DOMContentLoaded", () => {
             ${detailBlock("⚡ Momentum", safe(data.momentum, "—"))}
         `;
 
+        /* Zones / scénarios multiples */
+        const zones = Array.isArray(data.zones) ? data.zones : [];
+
+        const zonesHtml = zones.length ? `
+            <div class="zones-section">
+                <h3 class="zones-title">🎯 Scénarios multiples (${zones.length})</h3>
+                <div class="zones-grid">
+                    ${zones.map(z => renderZone(z)).join("")}
+                </div>
+            </div>
+        ` : "";
+
         return `
             <div class="result-main ${signalClass}">
                 <div class="result-signal">${escapeHtml(signal)}</div>
                 <div class="result-meta">
                     Direction : <strong>${escapeHtml(direction)}</strong>
                 </div>
-                <div class="strategy-badge">
+                <div class="strategy-badge ${strategyInfo.class}">
                     ${escapeHtml(strategyInfo.label)}
                     <span class="market-type">${escapeHtml(marketInfo)}</span>
                 </div>
@@ -474,10 +537,68 @@ document.addEventListener("DOMContentLoaded", () => {
                 ${detailBlock("📰 Economic News", safe(data.economic_news, "Non vérifiées"))}
             </div>
 
+            ${zonesHtml}
+
             <div class="copy-signal-area">
                 <button type="button" class="copy-signal-btn" data-mode="scan">
                     📋 Copier le signal
                 </button>
+            </div>
+        `;
+    }
+
+    /* =========================================================
+       RENDU — ZONE (SCÉNARIO)
+       ========================================================= */
+
+    function renderZone(zone) {
+
+        const typeClass =
+            zone.type.includes("BUY") ? "zone-buy" : "zone-sell";
+
+        const probClass =
+            zone.probability === "haute" ? "prob-high" :
+            zone.probability === "basse" ? "prob-low" :
+                                           "prob-mid";
+
+        return `
+            <div class="zone-card ${typeClass}">
+                <div class="zone-header">
+                    <span class="zone-id">${escapeHtml(zone.id)}</span>
+                    <span class="zone-type">${escapeHtml(zone.type.replace("_", " "))}</span>
+                    <span class="zone-priority">P${zone.priority}</span>
+                </div>
+
+                <div class="zone-label">${escapeHtml(zone.zone_label)}</div>
+
+                ${zone.zone_price ? `
+                    <div class="zone-price">📍 ${escapeHtml(zone.zone_price)}</div>
+                ` : ""}
+
+                <div class="zone-levels">
+                    <div><span>Entry</span><strong>${escapeHtml(String(zone.entry ?? "—"))}</strong></div>
+                    <div><span>SL</span><strong>${escapeHtml(String(zone.sl ?? "—"))}</strong></div>
+                    <div><span>TP1</span><strong>${escapeHtml(String(zone.tp1 ?? "—"))}</strong></div>
+                    <div><span>TP2</span><strong>${escapeHtml(String(zone.tp2 ?? "—"))}</strong></div>
+                    <div><span>TP3</span><strong>${escapeHtml(String(zone.tp3 ?? "—"))}</strong></div>
+                    <div><span>RR</span><strong>${escapeHtml(String(zone.rr ?? "—"))}</strong></div>
+                </div>
+
+                <div class="zone-probability ${probClass}">
+                    Probabilité : <strong>${escapeHtml(zone.probability)}</strong>
+                </div>
+
+                ${zone.trigger ? `
+                    <div class="zone-trigger">
+                        ⚡ <strong>Trigger :</strong> ${escapeHtml(zone.trigger)}
+                    </div>
+                ` : ""}
+
+                ${zone.invalidation ? `
+                    <div class="zone-invalidation">
+                        ⚠️ <strong>Invalidation :</strong> ${escapeHtml(zone.invalidation)}
+                    </div>
+                ` : ""}
             </div>
         `;
     }
@@ -546,7 +667,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /* =========================================================
-       HELPERS — STRATÉGIE / MARCHÉ
+       HELPERS STRATÉGIE / MARCHÉ
        ========================================================= */
 
     function getStrategyInfo(data) {
@@ -638,7 +759,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!risk || typeof risk !== "object") return "—";
 
         const parts = [];
-
         if (risk.risk_percent)   parts.push(`Risque : ${risk.risk_percent}`);
         if (risk.position_size)  parts.push(`Taille : ${risk.position_size}`);
         if (risk.recommendation) parts.push(risk.recommendation);

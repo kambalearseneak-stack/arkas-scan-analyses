@@ -1,12 +1,15 @@
 /* =========================================================
    ARKAS SCAN AI V2 — ASSISTANT DE SURVEILLANCE DERIV
-   Version corrigée : Authentification OTP obligatoire
+   Version corrigée : Authentification OTP + Telegram multi-utilisateurs
    ========================================================= */
 
 (function () {
     "use strict";
 
-    // État global
+    /* =========================================================
+       ÉTAT GLOBAL
+       ========================================================= */
+
     let derivSocket = null;
     let isConnected = false;
     let isMonitoring = false;
@@ -16,7 +19,10 @@
     let derivAccountType = "demo";
     let derivLoginId = null;
 
-    // Raccourcis DOM
+    /* =========================================================
+       RÉFÉRENCES DOM
+       ========================================================= */
+
     const connectBtn = document.getElementById("connect-deriv-btn");
     const tokenInput = document.getElementById("deriv-token");
     const accountSelect = document.getElementById("deriv-account");
@@ -29,10 +35,16 @@
     const stopBtn = document.getElementById("stop-monitor-btn");
     const monitorStatus = document.getElementById("monitor-status");
 
+    // Telegram
+    const telegramLink = document.getElementById("telegram-link");
+    const telegramStatus = document.getElementById("telegram-status");
+    const telegramTestBtn = document.getElementById("telegram-test-btn");
+    const telegramDisableBtn = document.getElementById("telegram-disable-btn");
+
     if (positionPanel) positionPanel.classList.add("hidden");
 
     /* =========================================================
-       CONNEXION VIA OTP (NOUVELLE MÉTHODE)
+       CONNEXION VIA OTP
        ========================================================= */
 
     if (connectBtn) {
@@ -61,38 +73,24 @@
         });
     }
 
-    /* =========================================================
-       LOGIQUE DE CONNEXION VIA OTP
-       ========================================================= */
-
     async function connectViaOTP() {
 
-        // 1. Récupérer le login ID depuis le token (via un appel REST simple)
-        //    Ou demander à l'utilisateur de le saisir si nécessaire.
-        //    Ici, on suppose qu'on va l'obtenir après la connexion WebSocket
-        //    ou via un appel REST préalable.
-
-        // Pour simplifier, on va demander à Deriv de nous donner les comptes
-        // Mais la méthode la plus directe : on appelle d'abord /accounts pour lister les comptes
-        const accountsUrl = `https://api.derivws.com/trading/v1/options/accounts`;
-
-        const accountsResponse = await fetch(accountsUrl, {
-            method: "GET",
-            headers: {
-                "Authorization": `Bearer ${derivToken}`
-            }
+        // 1. Récupérer la liste des comptes
+        const accountsResponse = await fetch("/api/deriv/accounts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ derivToken })
         });
 
+        const accountsData = await accountsResponse.json();
+
         if (!accountsResponse.ok) {
-            const errData = await accountsResponse.json().catch(() => ({}));
-            throw new Error(errData.error?.message || "Impossible de lister les comptes Deriv.");
+            throw new Error(accountsData.error || "Impossible de lister les comptes.");
         }
 
-        const accountsData = await accountsResponse.json();
-        const accounts = accountsData.data || [];
-
-        // Filtrer selon le type de compte choisi
+        const accounts = accountsData.accounts || [];
         const isVirtual = derivAccountType === "demo";
+
         const targetAccount = accounts.find(acc =>
             isVirtual ? acc.account_type === "virtual" : acc.account_type === "real"
         ) || accounts[0];
@@ -103,14 +101,13 @@
 
         derivLoginId = targetAccount.account_id;
 
-        // 2. Appeler notre API serveur pour obtenir l'URL OTP
+        // 2. Obtenir l'URL OTP
         const otpResponse = await fetch("/api/deriv/otp", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 accountId: derivLoginId,
-                derivToken: derivToken,
-                isDemo: isVirtual
+                derivToken: derivToken
             })
         });
 
@@ -136,7 +133,6 @@
 
                 isConnected = true;
 
-                // Mise à jour UI
                 if (loginIdEl) loginIdEl.textContent = derivLoginId;
                 if (balanceEl) balanceEl.textContent = "Chargement...";
 
@@ -148,7 +144,6 @@
                 // Demander le solde
                 derivSocket.send(JSON.stringify({ balance: 1, subscribe: 1 }));
 
-                // Notification Telegram
                 sendTelegramNotification(
                     `🤖 ARKAS Assistant\n` +
                     `✅ Connexion Deriv réussie\n` +
@@ -161,8 +156,6 @@
             derivSocket.onmessage = (event) => {
                 let data;
                 try { data = JSON.parse(event.data); } catch { return; }
-
-                // Gérer les messages
                 handleDerivMessage(data);
             };
 
@@ -180,12 +173,11 @@
     }
 
     /* =========================================================
-       GESTION DES MESSAGES DERIV
+       GESTION MESSAGES DERIV
        ========================================================= */
 
     function handleDerivMessage(data) {
 
-        // Réponse balance
         if (data.msg_type === "balance" && data.balance) {
             if (balanceEl) {
                 balanceEl.textContent = `${data.balance.balance} ${data.balance.currency}`;
@@ -193,7 +185,6 @@
             return;
         }
 
-        // Ticks
         if (data.msg_type === "tick" && data.tick) {
             if (data.subscription) {
                 currentSubscription = data.subscription.id;
@@ -205,7 +196,6 @@
             return;
         }
 
-        // Erreurs
         if (data.error) {
             console.error("Deriv error:", data.error);
             updateMonitorStatus("error", "❌ " + (data.error.message || "Erreur Deriv"));
@@ -227,18 +217,34 @@
         const direction = document.getElementById("pos-direction")?.value || "BUY";
         const entry = parseFloat(document.getElementById("pos-entry")?.value);
         const sl = parseFloat(document.getElementById("pos-sl")?.value);
-        const breakevenTrigger = parseFloat(document.getElementById("pos-breakeven-trigger")?.value || "1");
+        const breakevenTrigger = parseFloat(
+            document.getElementById("pos-breakeven-trigger")?.value || "1"
+        );
 
         if (!symbol || isNaN(entry) || isNaN(sl)) {
             updateMonitorStatus("error", "❌ Symbole, Entry et SL obligatoires.");
             return;
         }
 
+        if (direction === "BUY" && sl >= entry) {
+            updateMonitorStatus("error", "❌ BUY : SL doit être < Entry.");
+            return;
+        }
+
+        if (direction === "SELL" && sl <= entry) {
+            updateMonitorStatus("error", "❌ SELL : SL doit être > Entry.");
+            return;
+        }
+
         monitoredPosition = {
-            symbol, direction, entry, sl, breakevenTrigger, breakEvenDone: false
+            symbol,
+            direction,
+            entry,
+            sl,
+            breakevenTrigger,
+            breakEvenDone: false
         };
 
-        // S'abonner aux ticks
         if (currentSubscription) {
             derivSocket.send(JSON.stringify({ forget: currentSubscription }));
         }
@@ -260,28 +266,213 @@
         const risk = Math.abs(pos.entry - pos.sl);
         if (risk === 0) return;
 
-        if (pos.direction === "BUY" && price >= pos.entry + (risk * pos.breakevenTrigger)) {
+        const targetMove = risk * pos.breakevenTrigger;
+
+        if (pos.direction === "BUY" && price >= pos.entry + targetMove) {
             pos.breakEvenDone = true;
-            const msg = `🔒 BREAK-EVEN atteint !\nSymbole: ${pos.symbol}\nPrix: ${price}\nDéplace SL à: ${pos.entry}`;
+            const msg =
+                `🔒 BREAK-EVEN atteint !\n` +
+                `Symbole : ${pos.symbol}\n` +
+                `Prix : ${price}\n` +
+                `Déplace SL à : ${pos.entry}`;
             updateMonitorStatus("success", msg);
             sendTelegramNotification(msg);
         }
 
-        if (pos.direction === "SELL" && price <= pos.entry - (risk * pos.breakevenTrigger)) {
+        if (pos.direction === "SELL" && price <= pos.entry - targetMove) {
             pos.breakEvenDone = true;
-            const msg = `🔒 BREAK-EVEN atteint !\nSymbole: ${pos.symbol}\nPrix: ${price}\nDéplace SL à: ${pos.entry}`;
+            const msg =
+                `🔒 BREAK-EVEN atteint !\n` +
+                `Symbole : ${pos.symbol}\n` +
+                `Prix : ${price}\n` +
+                `Déplace SL à : ${pos.entry}`;
             updateMonitorStatus("success", msg);
             sendTelegramNotification(msg);
         }
     }
 
     /* =========================================================
-       HELPERS
+       ARRÊT SURVEILLANCE
+       ========================================================= */
+
+    if (stopBtn) {
+        stopBtn.addEventListener("click", () => {
+
+            isMonitoring = false;
+            monitoredPosition.breakEvenDone = false;
+
+            if (derivSocket && currentSubscription) {
+                derivSocket.send(JSON.stringify({ forget: currentSubscription }));
+                currentSubscription = null;
+            }
+
+            if (startBtn) startBtn.classList.remove("hidden");
+            if (stopBtn) stopBtn.classList.add("hidden");
+            updateMonitorStatus("info", "⏹️ Surveillance arrêtée.");
+            sendTelegramNotification("⏹️ Surveillance arrêtée.");
+        });
+    }
+
+    if (startBtn) startBtn.addEventListener("click", startMonitoring);
+
+    /* =========================================================
+       NOTIFICATIONS TELEGRAM (avec userId)
+       ========================================================= */
+
+    async function sendTelegramNotification(message) {
+
+        const userId = getCurrentUserId();
+        if (!userId) {
+            console.warn("Aucun userId — notification Telegram annulée.");
+            return;
+        }
+
+        try {
+            await fetch("/api/notify/telegram", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId, message })
+            });
+        } catch (err) {
+            console.warn("Telegram notify failed:", err);
+        }
+    }
+
+    function getCurrentUserId() {
+        return window.currentUser?.uid || null;
+    }
+
+    /* =========================================================
+       GESTION TELEGRAM — UI
+       ========================================================= */
+
+    async function loadTelegramStatus() {
+
+        const userId = getCurrentUserId();
+        if (!userId || !telegramStatus) return;
+
+        try {
+            const res = await fetch("/api/telegram/status", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId })
+            });
+
+            const data = await res.json();
+            updateTelegramUI(!!data.enabled);
+
+        } catch (err) {
+            console.warn("Status check failed:", err);
+            updateTelegramUI(false);
+        }
+    }
+
+    function updateTelegramUI(enabled) {
+
+        if (!telegramStatus) return;
+
+        if (enabled) {
+            telegramStatus.className = "telegram-status enabled";
+            telegramStatus.innerHTML = `
+                <span class="dot"></span>
+                <span>✅ Notifications activées</span>
+            `;
+            if (telegramTestBtn) telegramTestBtn.classList.remove("hidden");
+            if (telegramDisableBtn) telegramDisableBtn.classList.remove("hidden");
+            if (telegramLink) telegramLink.classList.add("hidden");
+
+        } else {
+            telegramStatus.className = "telegram-status disabled";
+            telegramStatus.innerHTML = `
+                <span class="dot"></span>
+                <span>❌ Non activé</span>
+            `;
+            if (telegramTestBtn) telegramTestBtn.classList.add("hidden");
+            if (telegramDisableBtn) telegramDisableBtn.classList.add("hidden");
+            if (telegramLink) telegramLink.classList.remove("hidden");
+        }
+    }
+
+    function setupTelegramLink() {
+
+        const userId = getCurrentUserId();
+        if (!userId || !telegramLink) return;
+
+        // ⚠️ Remplace par le username de ton bot
+        const botUsername = "Arkasscanai_bot";
+
+        telegramLink.href = `https://t.me/${botUsername}?start=${userId}`;
+    }
+
+    /* ---- Bouton Test ---- */
+    if (telegramTestBtn) {
+        telegramTestBtn.addEventListener("click", async () => {
+
+            const userId = getCurrentUserId();
+            if (!userId) return;
+
+            telegramTestBtn.disabled = true;
+            telegramTestBtn.textContent = "Envoi…";
+
+            try {
+                await fetch("/api/notify/telegram", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        userId,
+                        message:
+                            "🧪 <b>Test ARKAS</b>\n\n" +
+                            "Si tu vois ce message, tes notifications fonctionnent !"
+                    })
+                });
+
+                telegramTestBtn.textContent = "✅ Envoyé !";
+
+            } catch (err) {
+                telegramTestBtn.textContent = "❌ Échec";
+            }
+
+            setTimeout(() => {
+                telegramTestBtn.disabled = false;
+                telegramTestBtn.textContent = "🧪 Tester";
+            }, 2500);
+        });
+    }
+
+    /* ---- Bouton Désactiver ---- */
+    if (telegramDisableBtn) {
+        telegramDisableBtn.addEventListener("click", async () => {
+
+            const userId = getCurrentUserId();
+            if (!userId) return;
+
+            if (!confirm("Désactiver les notifications Telegram ?")) return;
+
+            try {
+                await fetch("/api/telegram/disable", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ userId })
+                });
+
+                updateTelegramUI(false);
+
+            } catch (err) {
+                alert("Erreur lors de la désactivation.");
+            }
+        });
+    }
+
+    /* =========================================================
+       UI HELPERS
        ========================================================= */
 
     function setConnectionStatus(type, message) {
+
         if (!connectionStatus) return;
+
         connectionStatus.className = "connection-status";
+
         if (type === "connected") connectionStatus.classList.add("connected");
         else if (type === "error") connectionStatus.classList.add("error");
         else if (type === "loading") connectionStatus.classList.add("loading");
@@ -292,34 +483,41 @@
     }
 
     function updateMonitorStatus(type, message) {
+
         if (!monitorStatus) return;
         monitorStatus.textContent = message;
         monitorStatus.className = "monitor-status status-" + type;
         monitorStatus.style.whiteSpace = "pre-line";
     }
 
-    async function sendTelegramNotification(message) {
-        try {
-            await fetch("/api/notify/telegram", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message })
-            });
-        } catch (e) { /* Ignorer */ }
+    /* =========================================================
+       INITIALISATION TELEGRAM
+       ========================================================= */
+
+    function initTelegram() {
+        if (getCurrentUserId()) {
+            loadTelegramStatus();
+            setupTelegramLink();
+        } else {
+            // Attendre que Firebase Auth soit prêt
+            setTimeout(() => {
+                loadTelegramStatus();
+                setupTelegramLink();
+            }, 1500);
+        }
     }
 
-    if (stopBtn) stopBtn.addEventListener("click", () => {
-        isMonitoring = false;
-        if (derivSocket && currentSubscription) {
-            derivSocket.send(JSON.stringify({ forget: currentSubscription }));
-            currentSubscription = null;
-        }
-        if (startBtn) startBtn.classList.remove("hidden");
-        if (stopBtn) stopBtn.classList.add("hidden");
-        updateMonitorStatus("info", "⏹️ Surveillance arrêtée.");
-        sendTelegramNotification("⏹️ Surveillance arrêtée.");
-    });
+    initTelegram();
 
-    if (startBtn) startBtn.addEventListener("click", startMonitoring);
+    /* =========================================================
+       CLEANUP
+       ========================================================= */
+
+    window.addEventListener("beforeunload", () => {
+        derivToken = null;
+        if (derivSocket && derivSocket.readyState === WebSocket.OPEN) {
+            derivSocket.close();
+        }
+    });
 
 })();

@@ -1,48 +1,30 @@
 /* =========================================================
    ARKAS SCAN AI V2 — ASSISTANT DE SURVEILLANCE DERIV
-   Surveille les positions et alerte pour le break-even.
-   Aucun ordre n'est placé automatiquement.
+   Version corrigée : Authentification OTP obligatoire
    ========================================================= */
 
 (function () {
-
     "use strict";
 
+    // État global
     let derivSocket = null;
     let isConnected = false;
     let isMonitoring = false;
     let currentSubscription = null;
-    let reconnectAttempts = 0;
-
-    let monitoredPosition = {
-        symbol: null,
-        direction: null,
-        entry: null,
-        sl: null,
-        tp: null,
-        breakevenTrigger: 1,
-        breakEvenDone: false
-    };
-
+    let monitoredPosition = {};
     let derivToken = null;
     let derivAccountType = "demo";
     let derivLoginId = null;
 
-    /* =========================================================
-       RÉFÉRENCES DOM
-       ========================================================= */
-
+    // Raccourcis DOM
     const connectBtn = document.getElementById("connect-deriv-btn");
     const tokenInput = document.getElementById("deriv-token");
     const accountSelect = document.getElementById("deriv-account");
     const connectionStatus = document.getElementById("connection-status");
-
     const connectionPanel = document.getElementById("assistant-connection");
     const positionPanel = document.getElementById("assistant-position");
-
     const balanceEl = document.getElementById("deriv-balance");
     const loginIdEl = document.getElementById("deriv-loginid");
-
     const startBtn = document.getElementById("start-monitor-btn");
     const stopBtn = document.getElementById("stop-monitor-btn");
     const monitorStatus = document.getElementById("monitor-status");
@@ -50,14 +32,13 @@
     if (positionPanel) positionPanel.classList.add("hidden");
 
     /* =========================================================
-       CONNEXION
+       CONNEXION VIA OTP (NOUVELLE MÉTHODE)
        ========================================================= */
 
     if (connectBtn) {
         connectBtn.addEventListener("click", async () => {
 
             const token = tokenInput ? tokenInput.value.trim() : "";
-
             if (!token) {
                 setConnectionStatus("error", "❌ Colle ton token Deriv.");
                 return;
@@ -66,11 +47,11 @@
             derivToken = token;
             derivAccountType = accountSelect ? accountSelect.value : "demo";
 
-            setConnectionStatus("loading", "🔄 Connexion à Deriv…");
+            setConnectionStatus("loading", "🔄 Connexion à Deriv...");
             connectBtn.disabled = true;
 
             try {
-                await connectToDeriv();
+                await connectViaOTP();
             } catch (err) {
                 console.error("Deriv error:", err);
                 setConnectionStatus("error", "❌ Échec : " + err.message);
@@ -80,135 +61,159 @@
         });
     }
 
-    function connectToDeriv() {
+    /* =========================================================
+       LOGIQUE DE CONNEXION VIA OTP
+       ========================================================= */
 
+    async function connectViaOTP() {
+
+        // 1. Récupérer le login ID depuis le token (via un appel REST simple)
+        //    Ou demander à l'utilisateur de le saisir si nécessaire.
+        //    Ici, on suppose qu'on va l'obtenir après la connexion WebSocket
+        //    ou via un appel REST préalable.
+
+        // Pour simplifier, on va demander à Deriv de nous donner les comptes
+        // Mais la méthode la plus directe : on appelle d'abord /accounts pour lister les comptes
+        const accountsUrl = `https://api.derivws.com/trading/v1/options/accounts`;
+
+        const accountsResponse = await fetch(accountsUrl, {
+            method: "GET",
+            headers: {
+                "Authorization": `Bearer ${derivToken}`
+            }
+        });
+
+        if (!accountsResponse.ok) {
+            const errData = await accountsResponse.json().catch(() => ({}));
+            throw new Error(errData.error?.message || "Impossible de lister les comptes Deriv.");
+        }
+
+        const accountsData = await accountsResponse.json();
+        const accounts = accountsData.data || [];
+
+        // Filtrer selon le type de compte choisi
+        const isVirtual = derivAccountType === "demo";
+        const targetAccount = accounts.find(acc =>
+            isVirtual ? acc.account_type === "virtual" : acc.account_type === "real"
+        ) || accounts[0];
+
+        if (!targetAccount) {
+            throw new Error("Aucun compte trouvé pour ce token.");
+        }
+
+        derivLoginId = targetAccount.account_id;
+
+        // 2. Appeler notre API serveur pour obtenir l'URL OTP
+        const otpResponse = await fetch("/api/deriv/otp", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                accountId: derivLoginId,
+                derivToken: derivToken,
+                isDemo: isVirtual
+            })
+        });
+
+        const otpData = await otpResponse.json();
+
+        if (!otpResponse.ok) {
+            throw new Error(otpData.error || "Impossible d'obtenir l'URL OTP.");
+        }
+
+        // 3. Se connecter au WebSocket avec l'URL OTP
         return new Promise((resolve, reject) => {
 
-            const appId = 1089;
-            const url = `wss://ws.derivws.com/websockets/v3?app_id=${appId}&l=FR`;
-
-            try {
-                derivSocket = new WebSocket(url);
-            } catch (err) {
-                reject(new Error("Impossible d'ouvrir la connexion"));
-                return;
-            }
+            derivSocket = new WebSocket(otpData.wsUrl);
 
             const timeout = setTimeout(() => {
                 if (derivSocket) derivSocket.close();
-                reject(new Error("Délai de connexion dépassé"));
-            }, 12000);
+                reject(new Error("Délai de connexion dépassé."));
+            }, 15000);
 
             derivSocket.onopen = () => {
                 clearTimeout(timeout);
-                console.log("🔗 WebSocket Deriv ouvert");
-                derivSocket.send(JSON.stringify({ authorize: derivToken }));
+                console.log("🔗 WebSocket Deriv connecté via OTP");
+
+                isConnected = true;
+
+                // Mise à jour UI
+                if (loginIdEl) loginIdEl.textContent = derivLoginId;
+                if (balanceEl) balanceEl.textContent = "Chargement...";
+
+                setConnectionStatus("connected", `✅ Connecté (${derivLoginId})`);
+                if (connectionPanel) connectionPanel.classList.add("hidden");
+                if (positionPanel) positionPanel.classList.remove("hidden");
+                connectBtn.disabled = false;
+
+                // Demander le solde
+                derivSocket.send(JSON.stringify({ balance: 1, subscribe: 1 }));
+
+                // Notification Telegram
+                sendTelegramNotification(
+                    `🤖 ARKAS Assistant\n` +
+                    `✅ Connexion Deriv réussie\n` +
+                    `Compte : ${derivLoginId}`
+                );
+
+                resolve();
             };
 
             derivSocket.onmessage = (event) => {
-
                 let data;
                 try { data = JSON.parse(event.data); } catch { return; }
 
-                /* ---- authorize ---- */
-                if (data.msg_type === "authorize") {
-
-                    if (data.error) {
-                        reject(new Error(data.error.message || "Token invalide"));
-                        return;
-                    }
-
-                    if (!data.authorize) {
-                        reject(new Error("Réponse authorize invalide"));
-                        return;
-                    }
-
-                    const auth = data.authorize;
-                    derivLoginId = auth.loginid;
-
-                    const isVirtual = auth.loginid.startsWith("VRTC");
-
-                    if (derivAccountType === "demo" && !isVirtual) {
-                        reject(new Error("Ce token n'est pas un compte démo."));
-                        return;
-                    }
-
-                    if (loginIdEl) loginIdEl.textContent = auth.loginid;
-                    if (balanceEl) {
-                        const cur = auth.currency || "USD";
-                        balanceEl.textContent = `${auth.balance} ${cur}`;
-                    }
-
-                    isConnected = true;
-                    reconnectAttempts = 0;
-
-                    setConnectionStatus("connected", `✅ Connecté (${auth.loginid})`);
-                    if (connectionPanel) connectionPanel.classList.add("hidden");
-                    if (positionPanel) positionPanel.classList.remove("hidden");
-                    connectBtn.disabled = false;
-
-                    sendTelegramNotification(
-                        `🤖 ARKAS Assistant\n` +
-                        `✅ Connexion Deriv réussie\n` +
-                        `Compte : ${auth.loginid}\n` +
-                        `Balance : ${auth.balance} ${auth.currency}`
-                    );
-
-                    resolve();
-                    return;
-                }
-
+                // Gérer les messages
                 handleDerivMessage(data);
             };
 
             derivSocket.onerror = () => {
                 clearTimeout(timeout);
-                reject(new Error("Erreur de connexion WebSocket"));
+                reject(new Error("Erreur de connexion WebSocket."));
             };
 
             derivSocket.onclose = () => {
-
                 isConnected = false;
                 isMonitoring = false;
-
-                if (connectionStatus) {
-                    setConnectionStatus("error", "⚠️ Déconnecté de Deriv");
-                }
-
-                if (derivToken && reconnectAttempts < 3) {
-                    reconnectAttempts++;
-                    setTimeout(() => {
-                        console.log(`🔄 Reconnexion (${reconnectAttempts}/3)…`);
-                        connectToDeriv().catch(() => {});
-                    }, 3000 * reconnectAttempts);
-                }
+                setConnectionStatus("error", "⚠️ Déconnecté de Deriv.");
             };
         });
     }
 
+    /* =========================================================
+       GESTION DES MESSAGES DERIV
+       ========================================================= */
+
     function handleDerivMessage(data) {
 
-        if (data.msg_type === "tick" && data.tick) {
-
-            if (data.subscription) {
-                currentSubscription = data.subscription.id;
+        // Réponse balance
+        if (data.msg_type === "balance" && data.balance) {
+            if (balanceEl) {
+                balanceEl.textContent = `${data.balance.balance} ${data.balance.currency}`;
             }
-
-            if (!isMonitoring) return;
-
-            const currentPrice = parseFloat(data.tick.quote);
-            if (!isNaN(currentPrice)) checkBreakEven(currentPrice);
             return;
         }
 
+        // Ticks
+        if (data.msg_type === "tick" && data.tick) {
+            if (data.subscription) {
+                currentSubscription = data.subscription.id;
+            }
+            if (isMonitoring) {
+                const price = parseFloat(data.tick.quote);
+                if (!isNaN(price)) checkBreakEven(price);
+            }
+            return;
+        }
+
+        // Erreurs
         if (data.error) {
-            console.error("Deriv API error:", data.error);
+            console.error("Deriv error:", data.error);
             updateMonitorStatus("error", "❌ " + (data.error.message || "Erreur Deriv"));
         }
     }
 
     /* =========================================================
-       DÉMARRAGE SURVEILLANCE
+       SURVEILLANCE / BREAK-EVEN
        ========================================================= */
 
     function startMonitoring() {
@@ -218,215 +223,65 @@
             return;
         }
 
-        const symbolEl = document.getElementById("pos-symbol");
-        const directionEl = document.getElementById("pos-direction");
-        const entryEl = document.getElementById("pos-entry");
-        const slEl = document.getElementById("pos-sl");
-        const tpEl = document.getElementById("pos-tp");
-        const beEl = document.getElementById("pos-breakeven-trigger");
+        const symbol = document.getElementById("pos-symbol")?.value.trim();
+        const direction = document.getElementById("pos-direction")?.value || "BUY";
+        const entry = parseFloat(document.getElementById("pos-entry")?.value);
+        const sl = parseFloat(document.getElementById("pos-sl")?.value);
+        const breakevenTrigger = parseFloat(document.getElementById("pos-breakeven-trigger")?.value || "1");
 
-        const symbol = symbolEl ? symbolEl.value.trim() : "";
-        const direction = directionEl ? directionEl.value : "BUY";
-        const entry = entryEl ? parseFloat(entryEl.value) : NaN;
-        const sl = slEl ? parseFloat(slEl.value) : NaN;
-        const tp = tpEl ? parseFloat(tpEl.value) : NaN;
-        const breakevenTrigger = beEl ? parseFloat(beEl.value) : 1;
-
-        if (!symbol) {
-            updateMonitorStatus("error", "❌ Symbole manquant.");
-            return;
-        }
-
-        if (isNaN(entry) || isNaN(sl)) {
-            updateMonitorStatus("error", "❌ Entry et SL obligatoires.");
-            return;
-        }
-
-        if (direction === "BUY" && sl >= entry) {
-            updateMonitorStatus("error", "❌ BUY : SL doit être < Entry.");
-            return;
-        }
-
-        if (direction === "SELL" && sl <= entry) {
-            updateMonitorStatus("error", "❌ SELL : SL doit être > Entry.");
+        if (!symbol || isNaN(entry) || isNaN(sl)) {
+            updateMonitorStatus("error", "❌ Symbole, Entry et SL obligatoires.");
             return;
         }
 
         monitoredPosition = {
-            symbol,
-            direction,
-            entry,
-            sl,
-            tp: isNaN(tp) ? null : tp,
-            breakevenTrigger,
-            breakEvenDone: false
+            symbol, direction, entry, sl, breakevenTrigger, breakEvenDone: false
         };
 
-        try {
-            if (currentSubscription) {
-                derivSocket.send(JSON.stringify({ forget: currentSubscription }));
-                currentSubscription = null;
-            }
-
-            derivSocket.send(JSON.stringify({
-                ticks: symbol,
-                subscribe: 1
-            }));
-
-        } catch (err) {
-            console.error("Subscribe error:", err);
-            updateMonitorStatus("error", "❌ Impossible de s'abonner aux ticks.");
-            return;
+        // S'abonner aux ticks
+        if (currentSubscription) {
+            derivSocket.send(JSON.stringify({ forget: currentSubscription }));
         }
+        derivSocket.send(JSON.stringify({ ticks: symbol, subscribe: 1 }));
 
         isMonitoring = true;
-
         if (startBtn) startBtn.classList.add("hidden");
         if (stopBtn) stopBtn.classList.remove("hidden");
 
-        const riskDistance = Math.abs(entry - sl);
-        const beTarget = direction === "BUY"
-            ? (entry + riskDistance * breakevenTrigger).toFixed(5)
-            : (entry - riskDistance * breakevenTrigger).toFixed(5);
-
-        updateMonitorStatus(
-            "success",
-            `👀 Surveillance active sur ${symbol}\n` +
-            `Break-even à ${beTarget} (+${breakevenTrigger}R)`
-        );
-
-        sendTelegramNotification(
-            `🤖 ARKAS Assistant\n` +
-            `▶️ Surveillance démarrée\n` +
-            `Symbole : ${symbol}\n` +
-            `Direction : ${direction}\n` +
-            `Entry : ${entry}\n` +
-            `SL : ${sl}\n` +
-            (monitoredPosition.tp ? `TP : ${monitoredPosition.tp}\n` : "") +
-            `Break-even après +${breakevenTrigger}R (prix ${beTarget})`
-        );
+        updateMonitorStatus("success", `👀 Surveillance de ${symbol} active.`);
+        sendTelegramNotification(`▶️ Surveillance démarrée sur ${symbol}`);
     }
 
-    /* =========================================================
-       BREAK-EVEN
-       ========================================================= */
-
-    function checkBreakEven(currentPrice) {
+    function checkBreakEven(price) {
 
         const pos = monitoredPosition;
-        if (!pos || !pos.entry || !pos.sl) return;
-        if (pos.breakEvenDone) return;
+        if (!pos || pos.breakEvenDone) return;
 
         const risk = Math.abs(pos.entry - pos.sl);
         if (risk === 0) return;
 
-        const targetMove = risk * pos.breakevenTrigger;
-
-        if (pos.direction === "BUY") {
-
-            const targetPrice = pos.entry + targetMove;
-
-            if (currentPrice >= targetPrice) {
-
-                pos.breakEvenDone = true;
-
-                updateMonitorStatus(
-                    "success",
-                    `🔒 BREAK-EVEN atteint à ${currentPrice}\n` +
-                    `➡️ Déplace ton SL à ${pos.entry}`
-                );
-
-                sendTelegramNotification(
-                    `🔒 ARKAS Assistant — BREAK-EVEN\n` +
-                    `Symbole : ${pos.symbol}\n` +
-                    `Direction : BUY\n` +
-                    `Prix actuel : ${currentPrice}\n` +
-                    `🎯 Cible atteinte : ${targetPrice}\n` +
-                    `➡️ Déplace ton SL à : ${pos.entry}`
-                );
-            }
+        if (pos.direction === "BUY" && price >= pos.entry + (risk * pos.breakevenTrigger)) {
+            pos.breakEvenDone = true;
+            const msg = `🔒 BREAK-EVEN atteint !\nSymbole: ${pos.symbol}\nPrix: ${price}\nDéplace SL à: ${pos.entry}`;
+            updateMonitorStatus("success", msg);
+            sendTelegramNotification(msg);
         }
 
-        if (pos.direction === "SELL") {
-
-            const targetPrice = pos.entry - targetMove;
-
-            if (currentPrice <= targetPrice) {
-
-                pos.breakEvenDone = true;
-
-                updateMonitorStatus(
-                    "success",
-                    `🔒 BREAK-EVEN atteint à ${currentPrice}\n` +
-                    `➡️ Déplace ton SL à ${pos.entry}`
-                );
-
-                sendTelegramNotification(
-                    `🔒 ARKAS Assistant — BREAK-EVEN\n` +
-                    `Symbole : ${pos.symbol}\n` +
-                    `Direction : SELL\n` +
-                    `Prix actuel : ${currentPrice}\n` +
-                    `🎯 Cible atteinte : ${targetPrice}\n` +
-                    `➡️ Déplace ton SL à : ${pos.entry}`
-                );
-            }
+        if (pos.direction === "SELL" && price <= pos.entry - (risk * pos.breakevenTrigger)) {
+            pos.breakEvenDone = true;
+            const msg = `🔒 BREAK-EVEN atteint !\nSymbole: ${pos.symbol}\nPrix: ${price}\nDéplace SL à: ${pos.entry}`;
+            updateMonitorStatus("success", msg);
+            sendTelegramNotification(msg);
         }
     }
 
     /* =========================================================
-       ARRÊT
-       ========================================================= */
-
-    if (stopBtn) {
-        stopBtn.addEventListener("click", () => {
-
-            isMonitoring = false;
-            monitoredPosition.breakEvenDone = false;
-
-            if (derivSocket && derivSocket.readyState === WebSocket.OPEN) {
-                if (currentSubscription) {
-                    derivSocket.send(JSON.stringify({ forget: currentSubscription }));
-                    currentSubscription = null;
-                }
-            }
-
-            if (startBtn) startBtn.classList.remove("hidden");
-            if (stopBtn) stopBtn.classList.add("hidden");
-
-            updateMonitorStatus("info", "⏹️ Surveillance arrêtée.");
-
-            sendTelegramNotification(`⏹️ ARKAS Assistant — Surveillance arrêtée`);
-        });
-    }
-
-    if (startBtn) startBtn.addEventListener("click", startMonitoring);
-
-    /* =========================================================
-       NOTIFICATIONS TELEGRAM
-       ========================================================= */
-
-    async function sendTelegramNotification(message) {
-        try {
-            await fetch("/api/notify/telegram", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message })
-            });
-        } catch (err) {
-            console.warn("Telegram notify failed:", err);
-        }
-    }
-
-    /* =========================================================
-       UI
+       HELPERS
        ========================================================= */
 
     function setConnectionStatus(type, message) {
-
         if (!connectionStatus) return;
-
         connectionStatus.className = "connection-status";
-
         if (type === "connected") connectionStatus.classList.add("connected");
         else if (type === "error") connectionStatus.classList.add("error");
         else if (type === "loading") connectionStatus.classList.add("loading");
@@ -437,22 +292,34 @@
     }
 
     function updateMonitorStatus(type, message) {
-
         if (!monitorStatus) return;
         monitorStatus.textContent = message;
         monitorStatus.className = "monitor-status status-" + type;
         monitorStatus.style.whiteSpace = "pre-line";
     }
 
-    /* =========================================================
-       CLEANUP
-       ========================================================= */
+    async function sendTelegramNotification(message) {
+        try {
+            await fetch("/api/notify/telegram", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message })
+            });
+        } catch (e) { /* Ignorer */ }
+    }
 
-    window.addEventListener("beforeunload", () => {
-        derivToken = null;
-        if (derivSocket && derivSocket.readyState === WebSocket.OPEN) {
-            derivSocket.close();
+    if (stopBtn) stopBtn.addEventListener("click", () => {
+        isMonitoring = false;
+        if (derivSocket && currentSubscription) {
+            derivSocket.send(JSON.stringify({ forget: currentSubscription }));
+            currentSubscription = null;
         }
+        if (startBtn) startBtn.classList.remove("hidden");
+        if (stopBtn) stopBtn.classList.add("hidden");
+        updateMonitorStatus("info", "⏹️ Surveillance arrêtée.");
+        sendTelegramNotification("⏹️ Surveillance arrêtée.");
     });
+
+    if (startBtn) startBtn.addEventListener("click", startMonitoring);
 
 })();

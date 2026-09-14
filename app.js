@@ -171,7 +171,7 @@ function updateFormMode() {
 
 
 /* =========================================================
-   TOGGLE LOGIN/SIGNUP
+   TOGGLE
    ========================================================= */
 
 if (toggleModeBtn) {
@@ -253,6 +253,15 @@ if (loginForm) {
 
 onAuthStateChanged(auth, function (user) {
 
+    /* Exposer l'utilisateur globalement pour assistant.js */
+    if (user) {
+        window.currentUser = user;
+        console.log("👤 Utilisateur connecté :", user.uid);
+    } else {
+        window.currentUser = null;
+    }
+
+    /* ---- PAGE LOGIN ---- */
     if (isLoginPage) {
         if (user) {
             window.location.replace("dashboard.html");
@@ -260,6 +269,7 @@ onAuthStateChanged(auth, function (user) {
         return;
     }
 
+    /* ---- PAGE DASHBOARD ---- */
     if (isDashboardPage) {
 
         if (!user) {

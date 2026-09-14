@@ -1,6 +1,7 @@
 /* =========================================================
    ARKAS SCAN AI V2 — DASHBOARD
    Scanner + Audit + Détection auto + Scénarios multiples
+   + Risk Manager + News
    ========================================================= */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -32,7 +33,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const globalLoader = document.getElementById("global-loader");
 
-    let selectedFile = null;
     let selectedBase64 = null;
     let selectedMimeType = null;
     let isProcessing = false;
@@ -98,22 +98,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /* =========================================================
-       COMPRESSION IMAGE (limite Vercel 4.5 Mo)
+       COMPRESSION IMAGE
        ========================================================= */
 
     function compressImage(file, maxWidth = 1600, quality = 0.85) {
-
         return new Promise((resolve, reject) => {
 
             const img = new Image();
             const url = URL.createObjectURL(file);
 
             img.onload = () => {
-
                 URL.revokeObjectURL(url);
 
                 let { width, height } = img;
-
                 if (width > maxWidth) {
                     height = Math.round((height * maxWidth) / width);
                     width = maxWidth;
@@ -127,10 +124,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 ctx.drawImage(img, 0, 0, width, height);
 
                 canvas.toBlob(
-                    (blob) => {
-                        if (!blob) return reject(new Error("Compression échouée"));
-                        resolve(blob);
-                    },
+                    (blob) => blob
+                        ? resolve(blob)
+                        : reject(new Error("Compression échouée")),
                     "image/jpeg",
                     quality
                 );
@@ -142,7 +138,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /* =========================================================
-       GESTION DU FICHIER
+       GESTION FICHIER
        ========================================================= */
 
     async function handleFile(file) {
@@ -164,14 +160,11 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        selectedFile = file;
-        selectedMimeType = "image/jpeg"; // après compression
-
+        selectedMimeType = "image/jpeg";
         showStatus("📷 Capture importée. Préparation du scanner…", "info");
 
         try {
             const compressedBlob = await compressImage(file);
-
             const reader = new FileReader();
 
             reader.onload = (event) => {
@@ -194,7 +187,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (resultsSection) resultsSection.style.display = "none";
 
                 setupScanOverlay();
-
                 showStatus("✅ Capture prête. Choisis SCANNER ou AUDITER.", "success");
 
                 if (scannerActions) {
@@ -209,10 +201,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (fileInput) fileInput.value = "";
             };
 
-            reader.onerror = () => {
-                showStatus("❌ Impossible de lire cette image.", "error");
-            };
-
+            reader.onerror = () => showStatus("❌ Impossible de lire cette image.", "error");
             reader.readAsDataURL(compressedBlob);
 
         } catch (err) {
@@ -240,7 +229,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const overlay = document.createElement("div");
         overlay.className = "scan-overlay";
-
         overlay.innerHTML = `
             <div class="scan-grid"></div>
             <div class="scan-line"></div>
@@ -253,7 +241,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <div class="scan-center">
                 <div class="scan-loader"></div>
                 <div class="scan-label">ARKAS SCAN EN COURS…</div>
-                <div class="scan-subtitle">PRICE ACTION • SMC</div>
+                <div class="scan-subtitle">PRICE ACTION • SMC • ICT</div>
             </div>
             <div class="scan-status">
                 <span class="scan-dot"></span>
@@ -280,7 +268,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (statusText) statusText.textContent = "AUDITING";
         } else {
             if (label) label.textContent = "ARKAS SCAN EN COURS…";
-            if (subtitle) subtitle.textContent = "PRICE ACTION • SMC";
+            if (subtitle) subtitle.textContent = "PRICE ACTION • SMC • ICT";
             if (statusText) statusText.textContent = "ANALYZING";
         }
 
@@ -311,7 +299,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /* =========================================================
-       ANALYSE PRINCIPALE
+       ANALYSE
        ========================================================= */
 
     async function analyzeImage(mode) {
@@ -327,7 +315,6 @@ document.addEventListener("DOMContentLoaded", () => {
         setButtonsDisabled(true);
 
         if (resultsSection) resultsSection.style.display = "none";
-
         if (globalLoader) globalLoader.classList.remove("hidden");
 
         startScanAnimation(mode);
@@ -344,7 +331,6 @@ document.addEventListener("DOMContentLoaded", () => {
             : selectedBase64;
 
         try {
-
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 60000);
 
@@ -372,9 +358,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             if (!response.ok) {
-                throw new Error(
-                    data?.error || data?.message || `Erreur serveur ${response.status}`
-                );
+                throw new Error(data?.error || `Erreur serveur ${response.status}`);
             }
 
             if (!data) throw new Error("Aucune réponse reçue.");
@@ -394,10 +378,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 showStatus("⏱️ Délai dépassé. Réessaie.", "error");
             } else {
                 console.error("ARKAS SCAN ERROR:", error);
-                showStatus(
-                    "❌ " + (error?.message || "Impossible de terminer l'analyse."),
-                    "error"
-                );
+                showStatus("❌ " + (error?.message || "Erreur."), "error");
             }
 
             stopScanAnimation();
@@ -408,10 +389,6 @@ document.addEventListener("DOMContentLoaded", () => {
             setButtonsDisabled(false);
         }
     }
-
-    /* =========================================================
-       DÉTECTION ACTIF / TIMEFRAME
-       ========================================================= */
 
     function updateDetectedInfo(data) {
 
@@ -432,7 +409,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /* =========================================================
-       AFFICHAGE DES RÉSULTATS
+       RENDU RÉSULTATS
        ========================================================= */
 
     function renderResults(data, mode) {
@@ -440,23 +417,14 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!resultsSection || !resultsContent) return;
 
         resultsSection.style.display = "block";
-
-        resultsContent.innerHTML =
-            mode === "audit"
-                ? renderAuditResults(data)
-                : renderScanResults(data);
+        resultsContent.innerHTML = mode === "audit"
+            ? renderAuditResults(data)
+            : renderScanResults(data);
 
         attachCopyButton();
 
-        resultsSection.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-        });
+        resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-
-    /* =========================================================
-       RENDU — SCAN
-       ========================================================= */
 
     function renderScanResults(data) {
 
@@ -471,9 +439,18 @@ document.addEventListener("DOMContentLoaded", () => {
             ? renderConfluence(data.confluence_status)
             : "";
 
+        const ictDetails = data.ict_analysis ? `
+            ${detailBlock("🎯 OTE", safe(data.ict_analysis.ote, "—"))}
+            ${detailBlock("🪤 IDM", safe(data.ict_analysis.idm, "—"))}
+            ${detailBlock("🔨 Breaker Block", safe(data.ict_analysis.breaker_block, "—"))}
+            ${detailBlock("🛡️ Mitigation Block", safe(data.ict_analysis.mitigation_block, "—"))}
+            ${detailBlock("⚖️ Premium/Discount", safe(data.ict_analysis.premium_discount, "—"))}
+        ` : "";
+
         const smcDetails = (
             data.strategy_applied === "SMC" ||
-            data.strategy_applied === "SMC_PA_HYBRID"
+            data.strategy_applied === "SMC_PA_HYBRID" ||
+            data.strategy_applied === "ICT"
         ) ? `
             ${detailBlock("💧 Liquidité", safe(data.liquidity, "—"))}
             ${detailBlock("📦 Order Block", safe(data.order_block, "—"))}
@@ -481,16 +458,14 @@ document.addEventListener("DOMContentLoaded", () => {
         ` : "";
 
         const paDetails = `
-            ${detailBlock("📏 Supports / Résistances", safe(data.supports_resistances, "—"))}
+            ${detailBlock("📏 Supports/Résistances", safe(data.supports_resistances, "—"))}
             ${detailBlock("📐 Trendlines", safe(data.trendlines, "—"))}
             ${detailBlock("💥 Cassure", safe(data.breakout, "—"))}
             ${detailBlock("🔄 Retest", safe(data.retest, "—"))}
             ${detailBlock("⚡ Momentum", safe(data.momentum, "—"))}
         `;
 
-        /* Zones / scénarios multiples */
         const zones = Array.isArray(data.zones) ? data.zones : [];
-
         const zonesHtml = zones.length ? `
             <div class="zones-section">
                 <h3 class="zones-title">🎯 Scénarios multiples (${zones.length})</h3>
@@ -499,6 +474,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
             </div>
         ` : "";
+
+        const riskHtml = renderRiskManager(data.risk_management);
 
         return `
             <div class="result-main ${signalClass}">
@@ -520,20 +497,22 @@ document.addEventListener("DOMContentLoaded", () => {
                 ${resultCard("💰 TP1", formatNumber(data.tp1))}
                 ${resultCard("💰 TP2", formatNumber(data.tp2))}
                 ${resultCard("💰 TP3", formatNumber(data.tp3))}
-                ${resultCard("📊 Risk / Reward", safe(data.rr, "—"))}
+                ${resultCard("📊 Risk/Reward", safe(data.rr, "—"))}
                 ${resultCard("🎯 Confiance", safe(data.confidence_percent, "—") + "%")}
                 ${resultCard("⭐ ARKAS Score", safe(data.arkas_score, "—"))}
             </div>
 
+            ${riskHtml}
+
             <div class="analysis-details">
                 ${detailBlock("📈 Structure", safe(data.structure, "—"))}
+                ${ictDetails}
                 ${smcDetails}
                 ${paDetails}
                 ${detailBlock("🧠 Pourquoi ?", safe(data.reason, "—"))}
                 ${detailBlock("🎯 Scénario principal", safe(data.primary_scenario, "—"))}
                 ${detailBlock("🔄 Scénario alternatif", safe(data.alternative_scenario, "—"))}
                 ${detailBlock("⚠️ Invalidation", safe(data.invalidation, "—"))}
-                ${detailBlock("🛡️ Risk Management", formatRisk(data.risk_management))}
                 ${detailBlock("📰 Economic News", safe(data.economic_news, "Non vérifiées"))}
             </div>
 
@@ -547,19 +526,49 @@ document.addEventListener("DOMContentLoaded", () => {
         `;
     }
 
-    /* =========================================================
-       RENDU — ZONE (SCÉNARIO)
-       ========================================================= */
+    function renderRiskManager(risk) {
+
+        if (!risk || typeof risk !== "object") return "";
+
+        return `
+            <div class="risk-manager">
+                <h3>🛡️ Gestionnaire de risque (Assurance)</h3>
+
+                <div class="risk-grid">
+                    <div class="risk-item">
+                        <span>Risque recommandé</span>
+                        <strong>${escapeHtml(risk.risk_percent || "1%")}</strong>
+                    </div>
+                    <div class="risk-item">
+                        <span>RR minimum</span>
+                        <strong>${escapeHtml(String(risk.rr_minimum || 1.5))}</strong>
+                    </div>
+                    <div class="risk-item">
+                        <span>Position sizing</span>
+                        <strong>${escapeHtml(risk.position_recommendation || "—")}</strong>
+                    </div>
+                    <div class="risk-item">
+                        <span>Invalidation</span>
+                        <strong>${escapeHtml(risk.invalidation_condition || "—")}</strong>
+                    </div>
+                </div>
+
+                ${risk.insurance_note ? `
+                    <div class="insurance-note">
+                        🔔 <strong>Note d'assurance :</strong> ${escapeHtml(risk.insurance_note)}
+                    </div>
+                ` : ""}
+            </div>
+        `;
+    }
 
     function renderZone(zone) {
 
-        const typeClass =
-            zone.type.includes("BUY") ? "zone-buy" : "zone-sell";
+        const typeClass = zone.type.includes("BUY") ? "zone-buy" : "zone-sell";
 
         const probClass =
             zone.probability === "haute" ? "prob-high" :
-            zone.probability === "basse" ? "prob-low" :
-                                           "prob-mid";
+            zone.probability === "basse" ? "prob-low" : "prob-mid";
 
         return `
             <div class="zone-card ${typeClass}">
@@ -603,10 +612,6 @@ document.addEventListener("DOMContentLoaded", () => {
         `;
     }
 
-    /* =========================================================
-       RENDU — AUDIT
-       ========================================================= */
-
     function renderAuditResults(data) {
 
         const audit = data.audit || {};
@@ -617,8 +622,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const errors = safeList(audit.errors);
         const corrections = safeList(audit.corrections);
         const corrected = audit.corrected_trade || {};
+        const verification = audit.verification || {};
 
         const statusInfo = getAuditStatus(status);
+        const verificationHtml = renderVerification(verification);
 
         return `
             <div class="audit-verdict ${statusInfo.className}">
@@ -628,6 +635,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     <div class="audit-description">${escapeHtml(verdict)}</div>
                 </div>
             </div>
+
+            ${verificationHtml}
 
             <div class="audit-columns">
                 <div class="audit-box">
@@ -657,6 +666,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     ${resultCard("RR", safe(corrected.rr, "—"))}
                 </div>
 
+                <div class="validation-probability">
+                    <span>Probabilité de validation :</span>
+                    <strong>${escapeHtml(String(corrected.validation_probability ?? "—"))}%</strong>
+                </div>
+
                 <div class="copy-signal-area">
                     <button type="button" class="copy-signal-btn" data-mode="audit">
                         📋 Copier le signal corrigé
@@ -666,64 +680,73 @@ document.addEventListener("DOMContentLoaded", () => {
         `;
     }
 
-    /* =========================================================
-       HELPERS STRATÉGIE / MARCHÉ
-       ========================================================= */
+    function renderVerification(v) {
+
+        const items = [
+            { label: "SL structure", value: v.sl_structure },
+            { label: "RR check", value: v.rr_check },
+            { label: "Confluence", value: v.confluence_check },
+            { label: "Biais aligné", value: v.bias_alignment },
+            { label: "Premium/Discount", value: v.premium_discount },
+            { label: "Risque news", value: v.news_risk },
+            { label: "Timeframe", value: v.timeframe_check }
+        ];
+
+        return `
+            <div class="verification-grid">
+                ${items.map(item => `
+                    <div class="verification-item ${getVerificationClass(item.value)}">
+                        <span>${escapeHtml(item.label)}</span>
+                        <strong>${escapeHtml(item.value || "—")}</strong>
+                    </div>
+                `).join("")}
+            </div>
+        `;
+    }
+
+    function getVerificationClass(value) {
+        const v = String(value || "").toUpperCase();
+        if (v === "PASS") return "verify-pass";
+        if (v === "FAIL") return "verify-fail";
+        return "verify-unclear";
+    }
 
     function getStrategyInfo(data) {
-
         switch (data.strategy_applied) {
-
-            case "SMC":
-                return { label: "🎯 SMC Pur", class: "strat-smc" };
-
-            case "SMC_PA_HYBRID":
-                return { label: "⚡ SMC + Price Action", class: "strat-hybrid" };
-
-            case "PRICE_ACTION_SIMPLIFIED":
-                return { label: "📊 Price Action Simplifiée", class: "strat-pa" };
-
-            case "AUDIT":
-                return { label: "🧪 Audit", class: "strat-audit" };
-
-            default:
-                return { label: "🔍 Analyse", class: "strat-default" };
+            case "SMC": return { label: "🎯 SMC Pur", class: "strat-smc" };
+            case "ICT": return { label: "🎯 ICT", class: "strat-ict" };
+            case "SMC_PA_HYBRID": return { label: "⚡ SMC + PA", class: "strat-hybrid" };
+            case "PRICE_ACTION_SIMPLIFIED": return { label: "📊 Price Action", class: "strat-pa" };
+            case "AUDIT": return { label: "🧪 Audit", class: "strat-audit" };
+            default: return { label: "🔍 Analyse", class: "strat-default" };
         }
     }
 
     function getMarketInfo(data) {
-
         switch (data.market_type) {
-            case "GOLD":         return "🥇 Or";
-            case "FOREX":        return "💱 Forex";
+            case "GOLD": return "🥇 Or";
+            case "FOREX": return "💱 Forex";
             case "CRYPTO_MAJOR": return "₿ Crypto";
-            case "INDICES":      return "📈 Indices";
-            case "OTHER":        return "🔍 Autre";
-            default:             return "Détection auto";
+            case "INDICES": return "📈 Indices";
+            case "OTHER": return "🔍 Autre";
+            default: return "Détection auto";
         }
     }
 
     function renderConfluence(status) {
-
         const map = {
-            ALIGNED:      { cls: "confluence-aligned",      label: "✅ SMC et Price Action alignés" },
-            PARTIAL:      { cls: "confluence-partial",      label: "⚠️ Alignement partiel SMC/PA" },
-            DISAGREEMENT: { cls: "confluence-disagreement", label: "❌ Désaccord SMC / Price Action" },
-            NEUTRAL:      { cls: "confluence-neutral",      label: "➖ Confluence neutre" }
+            ALIGNED: { cls: "confluence-aligned", label: "✅ Alignés" },
+            PARTIAL: { cls: "confluence-partial", label: "⚠️ Partiel" },
+            DISAGREEMENT: { cls: "confluence-disagreement", label: "❌ Désaccord" },
+            NEUTRAL: { cls: "confluence-neutral", label: "➖ Neutre" }
         };
-
         const info = map[status] || map.NEUTRAL;
-
         return `
             <div class="confluence-banner ${info.cls}">
                 <strong>Confluence :</strong> ${escapeHtml(info.label)}
             </div>
         `;
     }
-
-    /* =========================================================
-       OUTILS AFFICHAGE
-       ========================================================= */
 
     function resultCard(title, value) {
         return `
@@ -744,26 +767,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function renderList(items) {
-        if (!items.length) {
-            return `<p class="empty-list">Aucun élément.</p>`;
-        }
+        if (!items.length) return `<p class="empty-list">Aucun élément.</p>`;
         return `
             <ul>
                 ${items.map(item => `<li>${escapeHtml(String(item))}</li>`).join("")}
             </ul>
         `;
-    }
-
-    function formatRisk(risk) {
-
-        if (!risk || typeof risk !== "object") return "—";
-
-        const parts = [];
-        if (risk.risk_percent)   parts.push(`Risque : ${risk.risk_percent}`);
-        if (risk.position_size)  parts.push(`Taille : ${risk.position_size}`);
-        if (risk.recommendation) parts.push(risk.recommendation);
-
-        return parts.length ? parts.join(" • ") : "—";
     }
 
     function safe(value, fallback = "—") {
@@ -790,47 +799,27 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function getAuditStatus(status) {
-
         switch (String(status).toUpperCase()) {
-            case "VALIDATED":
-                return { icon: "✅", title: "ANALYSE VALIDÉE", className: "audit-valid" };
-            case "CORRECT":
-                return { icon: "⚠️", title: "ANALYSE À CORRIGER", className: "audit-correct" };
-            case "PREMATURE":
-                return { icon: "🟡", title: "ENTRÉE PRÉMATURÉE", className: "audit-premature" };
-            case "INVALID":
-                return { icon: "❌", title: "ANALYSE INVALIDÉE", className: "audit-invalid" };
-            default:
-                return { icon: "❓", title: "ANALYSE NON DÉTERMINÉE", className: "audit-unclear" };
+            case "VALIDATED": return { icon: "✅", title: "ANALYSE VALIDÉE", className: "audit-valid" };
+            case "CORRECT": return { icon: "⚠️", title: "ANALYSE À CORRIGER", className: "audit-correct" };
+            case "PREMATURE": return { icon: "🟡", title: "ENTRÉE PRÉMATURÉE", className: "audit-premature" };
+            case "INVALID": return { icon: "❌", title: "ANALYSE INVALIDÉE", className: "audit-invalid" };
+            default: return { icon: "❓", title: "ANALYSE NON DÉTERMINÉE", className: "audit-unclear" };
         }
     }
 
-    /* =========================================================
-       COPIER LE SIGNAL
-       ========================================================= */
-
     function attachCopyButton() {
-
         const copyBtns = document.querySelectorAll(".copy-signal-btn");
-
         copyBtns.forEach((copyBtn) => {
-
             if (copyBtn.dataset.bound === "true") return;
             copyBtn.dataset.bound = "true";
-
             copyBtn.addEventListener("click", async () => {
-
                 const text = createCopyText();
-
                 try {
                     await navigator.clipboard.writeText(text);
                     const original = copyBtn.textContent;
                     copyBtn.textContent = "✅ Signal copié !";
-
-                    setTimeout(() => {
-                        copyBtn.textContent = original;
-                    }, 2000);
-
+                    setTimeout(() => { copyBtn.textContent = original; }, 2000);
                 } catch (error) {
                     console.error("Copy error:", error);
                     copyBtn.textContent = "❌ Copie impossible";
@@ -843,10 +832,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!resultsContent) return "";
         return resultsContent.innerText.trim();
     }
-
-    /* =========================================================
-       BOUTONS / STATUS
-       ========================================================= */
 
     function setButtonsDisabled(disabled) {
         if (analyzeBtn) analyzeBtn.disabled = disabled;

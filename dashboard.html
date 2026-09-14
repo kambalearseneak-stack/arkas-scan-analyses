@@ -2,15 +2,16 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>ARKAS SCAN AI V2</title>
 
     <link rel="stylesheet" href="style.css">
 </head>
 
-<body>
+<body class="dashboard-body">
+
+<div class="bg-overlay"></div>
 
 <header class="topbar">
 
@@ -25,9 +26,7 @@
 
     <div id="user-status">
         <span id="user-email"></span>
-        <button id="logout-btn" type="button">
-            Déconnexion
-        </button>
+        <button id="logout-btn" type="button">Déconnexion</button>
     </div>
 
 </header>
@@ -36,42 +35,29 @@
 <main class="container">
 
     <section class="hero">
-
-        <h2>
-            Analyse ton graphique avec ARKAS AI
-        </h2>
-
+        <h2>Analyse ton graphique avec ARKAS AI</h2>
         <p>
             Importe simplement une capture.
             ARKAS détecte automatiquement l'actif,
             le timeframe et la structure du marché.
         </p>
-
     </section>
 
 
     <!-- ================================================= -->
-    <!-- IMPORT -->
+    <!-- IMPORT                                            -->
     <!-- ================================================= -->
 
     <section class="scanner-card">
 
         <div class="section-title">
-
             <span class="icon">📷</span>
-
             <div>
                 <h2>Capture du graphique</h2>
-
-                <p>
-                    Aucun réglage manuel nécessaire.
-                </p>
+                <p>Aucun réglage manuel nécessaire.</p>
             </div>
-
         </div>
 
-
-        <!-- INPUT REEL -->
         <input
             id="chart-file"
             type="file"
@@ -79,8 +65,6 @@
             hidden
         >
 
-
-        <!-- ZONE IMPORT -->
         <div
             id="dropZone"
             class="drop-zone"
@@ -88,22 +72,10 @@
             role="button"
             aria-label="Importer une capture de graphique"
         >
-
-            <div class="upload-icon">
-                📷
-            </div>
-
-            <h3>
-                Importer une capture
-            </h3>
-
-            <p>
-                Appuie ici pour choisir une image
-            </p>
-
-            <small>
-                JPG • PNG • WEBP — 10 MB maximum
-            </small>
+            <div class="upload-icon">📷</div>
+            <h3>Importer une capture</h3>
+            <p>Appuie ici pour choisir une image</p>
+            <small>JPG • PNG • WEBP — 10 MB maximum</small>
 
             <button
                 id="import-btn"
@@ -112,76 +84,44 @@
             >
                 📷 IMPORTER UNE CAPTURE
             </button>
-
         </div>
 
-
-        <!-- APERCU -->
         <div
             id="preview-container"
             class="preview-container"
             style="display:none;"
         >
-
             <div class="preview-header">
-
-                <strong>
-                    Capture sélectionnée
-                </strong>
-
+                <strong>Capture sélectionnée</strong>
                 <span id="file-name"></span>
-
             </div>
 
             <div class="preview-image-wrapper">
-
-                <img
-                    id="image-preview"
-                    alt="Aperçu du graphique"
-                >
-
+                <img id="image-preview" alt="Aperçu du graphique">
             </div>
-
         </div>
 
-
-        <!-- DETECTION -->
         <div
             id="detected-info"
             class="detected-info"
             style="display:none;"
         >
-
             <div class="detected-item">
-
                 <span>Actif détecté</span>
-
-                <strong id="detected-asset">
-                    Analyse...
-                </strong>
-
+                <strong id="detected-asset">Analyse...</strong>
             </div>
 
             <div class="detected-item">
-
                 <span>Timeframe détecté</span>
-
-                <strong id="detected-timeframe">
-                    Analyse...
-                </strong>
-
+                <strong id="detected-timeframe">Analyse...</strong>
             </div>
-
         </div>
 
-
-        <!-- BOUTONS -->
         <div
             id="scanner-actions"
             class="scanner-actions"
             style="display:none;"
         >
-
             <button
                 id="analyze-btn"
                 type="button"
@@ -197,11 +137,8 @@
             >
                 🧪 VÉRIFIER MON ANALYSE
             </button>
-
         </div>
 
-
-        <!-- STATUS -->
         <div
             id="analysis-status"
             class="analysis-status"
@@ -213,45 +150,156 @@
 
 
     <!-- ================================================= -->
-    <!-- RESULTATS -->
+    <!-- RÉSULTATS                                         -->
     <!-- ================================================= -->
 
     <section
         id="results-section"
         class="results-section"
     >
-
         <div class="section-title">
-
             <span class="icon">🎯</span>
-
             <div>
                 <h2>Résultat ARKAS</h2>
-
-                <p>
-                    Le signal apparaîtra ici.
-                </p>
+                <p>Le signal apparaîtra ici.</p>
             </div>
+        </div>
+
+        <div id="results-content">
+            <div class="empty-result">
+                <div>📊</div>
+                <h3>Aucun graphique analysé</h3>
+                <p>Importe une capture pour commencer.</p>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ================================================= -->
+    <!-- ASSISTANT DE SURVEILLANCE                         -->
+    <!-- ================================================= -->
+
+    <section class="assistant-section" id="assistant-section">
+
+        <div class="section-title">
+            <span class="icon">🤖</span>
+            <div>
+                <h2>Assistant de surveillance</h2>
+                <p>Surveille ta position et t'alerte pour le break-even.</p>
+            </div>
+        </div>
+
+        <!-- Connexion Deriv -->
+        <div class="assistant-connection" id="assistant-connection">
+
+            <div class="connection-status disconnected" id="connection-status">
+                <span class="dot"></span>
+                <span>Non connecté à Deriv</span>
+            </div>
+
+            <div class="form-group">
+                <label for="deriv-token">Token API Deriv</label>
+                <input
+                    type="password"
+                    id="deriv-token"
+                    placeholder="Colle ton token ici (jamais stocké)"
+                    autocomplete="off"
+                >
+                <small>
+                    🔒 Le token reste en mémoire uniquement.
+                    Crée un token dédié sur Deriv avec scope
+                    <strong>Read + Trade</strong>.
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label for="deriv-account">Type de compte</label>
+                <select id="deriv-account">
+                    <option value="demo">Compte démo (test)</option>
+                    <option value="real">Compte réel</option>
+                </select>
+            </div>
+
+            <button id="connect-deriv-btn" class="primary-button">
+                🔌 Se connecter à Deriv
+            </button>
 
         </div>
 
+        <!-- Formulaire position -->
+        <div class="assistant-position hidden" id="assistant-position">
 
-        <div id="results-content">
+            <div class="detected-info" id="deriv-account-info">
+                <div class="detected-item">
+                    <span>Compte</span>
+                    <strong id="deriv-loginid">—</strong>
+                </div>
+                <div class="detected-item">
+                    <span>Balance</span>
+                    <strong id="deriv-balance">—</strong>
+                </div>
+            </div>
 
-            <div class="empty-result">
+            <h3 class="assistant-subtitle">
+                📍 Paramètres de la position à surveiller
+            </h3>
 
-                <div>
-                    📊
+            <div class="position-grid">
+
+                <div class="form-group">
+                    <label for="pos-symbol">Symbole</label>
+                    <input
+                        type="text"
+                        id="pos-symbol"
+                        placeholder="R_10, R_75, frxEURUSD..."
+                    >
                 </div>
 
-                <h3>
-                    Aucun graphique analysé
-                </h3>
+                <div class="form-group">
+                    <label for="pos-direction">Direction</label>
+                    <select id="pos-direction">
+                        <option value="BUY">BUY (CALL)</option>
+                        <option value="SELL">SELL (PUT)</option>
+                    </select>
+                </div>
 
-                <p>
-                    Importe une capture pour commencer.
-                </p>
+                <div class="form-group">
+                    <label for="pos-entry">Entry (prix)</label>
+                    <input type="number" id="pos-entry" step="any" placeholder="1234.56">
+                </div>
 
+                <div class="form-group">
+                    <label for="pos-sl">Stop Loss (prix)</label>
+                    <input type="number" id="pos-sl" step="any" placeholder="1230.00">
+                </div>
+
+                <div class="form-group">
+                    <label for="pos-tp">Take Profit (prix)</label>
+                    <input type="number" id="pos-tp" step="any" placeholder="1250.00">
+                </div>
+
+                <div class="form-group">
+                    <label for="pos-breakeven-trigger">Break-even après (+R)</label>
+                    <select id="pos-breakeven-trigger">
+                        <option value="1">1R (recommandé)</option>
+                        <option value="1.5">1.5R</option>
+                        <option value="2">2R</option>
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="assistant-actions">
+                <button id="start-monitor-btn" class="primary-button">
+                    ▶️ Activer la surveillance
+                </button>
+                <button id="stop-monitor-btn" class="secondary-button hidden">
+                    ⏹️ Arrêter
+                </button>
+            </div>
+
+            <div class="monitor-status" id="monitor-status">
+                En attente de démarrage…
             </div>
 
         </div>
@@ -260,84 +308,56 @@
 
 
     <!-- ================================================= -->
-    <!-- METHODE -->
+    <!-- MÉTHODE                                           -->
     <!-- ================================================= -->
 
     <section class="method-section">
-
-        <h2>
-            🧠 Méthode ARKAS
-        </h2>
+        <h2>🧠 Méthode ARKAS</h2>
 
         <div class="method-grid">
-
-            <div>
-                <strong>BOS</strong>
-                <span>Break Of Structure</span>
-            </div>
-
-            <div>
-                <strong>CHoCH</strong>
-                <span>Change Of Character</span>
-            </div>
-
-            <div>
-                <strong>OB</strong>
-                <span>Order Block</span>
-            </div>
-
-            <div>
-                <strong>FVG</strong>
-                <span>Fair Value Gap</span>
-            </div>
-
-            <div>
-                <strong>LIQUIDITÉ</strong>
-                <span>Liquidity Sweep</span>
-            </div>
-
-            <div>
-                <strong>PRICE ACTION</strong>
-                <span>Structure et confirmation</span>
-            </div>
-
+            <div><strong>BOS</strong><span>Break Of Structure</span></div>
+            <div><strong>CHoCH</strong><span>Change Of Character</span></div>
+            <div><strong>OB</strong><span>Order Block</span></div>
+            <div><strong>FVG</strong><span>Fair Value Gap</span></div>
+            <div><strong>LIQUIDITÉ</strong><span>Liquidity Sweep</span></div>
+            <div><strong>PRICE ACTION</strong><span>Structure et confirmation</span></div>
         </div>
-
     </section>
 
 
     <!-- ================================================= -->
-    <!-- AVERTISSEMENT -->
+    <!-- AVERTISSEMENT                                     -->
     <!-- ================================================= -->
 
     <section class="risk-notice">
-
-        <strong>
-            ⚠️ Gestion du risque
-        </strong>
-
+        <strong>⚠️ Gestion du risque</strong>
         <p>
             ARKAS SCAN AI fournit une analyse technique
             et ne garantit aucun résultat financier.
             Toujours confirmer le signal et gérer le risque.
         </p>
-
     </section>
 
 </main>
 
 
 <footer>
-
-    <p>
-        © 2026 ARKAS SCAN AI V2
-    </p>
-
+    <p>© 2026 ARKAS SCAN AI V2</p>
 </footer>
+
+
+<div id="global-loader" class="global-loader hidden">
+    <div class="loader-box">
+        <div class="loader-spinner"></div>
+        <p>ARKAS analyse en cours…</p>
+        <small>Ne ferme pas cette page</small>
+    </div>
+</div>
 
 
 <script type="module" src="app.js"></script>
 <script type="module" src="dashboard.js"></script>
+<script src="assistant.js"></script>
 
 </body>
 </html>

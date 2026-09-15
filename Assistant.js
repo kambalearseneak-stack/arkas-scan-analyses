@@ -1,9 +1,6 @@
 /* =========================================================
    ARKAS SCAN AI V2 — ASSISTANT DE SURVEILLANCE DERIV
-   OTP + Break-even + Notifications Telegram
-   Chemins API : /api/deriv-accounts, /api/deriv-otp,
-                 /api/notify-telegram, /api/telegram-status,
-                 /api/telegram-disable
+   Version WebSocket direct (sans API REST)
    ========================================================= */
 
 (function () {
@@ -38,7 +35,6 @@
     const stopBtn = document.getElementById("stop-monitor-btn");
     const monitorStatus = document.getElementById("monitor-status");
 
-    // Telegram
     const telegramLink = document.getElementById("telegram-link");
     const telegramStatus = document.getElementById("telegram-status");
     const telegramTestBtn = document.getElementById("telegram-test-btn");
@@ -47,7 +43,7 @@
     if (positionPanel) positionPanel.classList.add("hidden");
 
     /* =========================================================
-       CONNEXION VIA OTP
+       CONNEXION DIRECTE VIA WEBSOCKET
        ========================================================= */
 
     if (connectBtn) {
@@ -66,7 +62,7 @@
             connectBtn.disabled = true;
 
             try {
-                await connectViaOTP();
+                await connectToDeriv();
             } catch (err) {
                 console.error("Deriv error:", err);
                 setConnectionStatus("error", "❌ Échec : " + err.message);
@@ -76,100 +72,100 @@
         });
     }
 
-    async function connectViaOTP() {
+    function connectToDeriv() {
 
-        /* 1. Récupérer la liste des comptes */
-        const accountsResponse = await fetch("/api/deriv-accounts", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ derivToken })
-        });
-
-        const accountsData = await accountsResponse.json();
-
-        if (!accountsResponse.ok) {
-            throw new Error(accountsData.error || "Impossible de lister les comptes.");
-        }
-
-        const accounts = accountsData.accounts || [];
-        const isVirtual = derivAccountType === "demo";
-
-        const targetAccount = accounts.find(acc =>
-            isVirtual ? acc.account_type === "virtual" : acc.account_type === "real"
-        ) || accounts[0];
-
-        if (!targetAccount) {
-            throw new Error("Aucun compte trouvé pour ce token.");
-        }
-
-        derivLoginId = targetAccount.account_id;
-
-        /* 2. Obtenir l'URL OTP */
-        const otpResponse = await fetch("/api/deriv-otp", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                accountId: derivLoginId,
-                derivToken: derivToken
-            })
-        });
-
-        const otpData = await otpResponse.json();
-
-        if (!otpResponse.ok) {
-            throw new Error(otpData.error || "Impossible d'obtenir l'URL OTP.");
-        }
-
-        /* 3. Se connecter au WebSocket */
         return new Promise((resolve, reject) => {
 
-            derivSocket = new WebSocket(otpData.wsUrl);
+            /* App ID = 1089 (public) pour le WebSocket */
+            const appId = 1089;
+            const url = `wss://ws.derivws.com/websockets/v3?app_id=${appId}&l=FR`;
+
+            try {
+                derivSocket = new WebSocket(url);
+            } catch (err) {
+                reject(new Error("Impossible d'ouvrir la connexion"));
+                return;
+            }
 
             const timeout = setTimeout(() => {
                 if (derivSocket) derivSocket.close();
-                reject(new Error("Délai de connexion dépassé."));
+                reject(new Error("Délai de connexion dépassé (15s)"));
             }, 15000);
 
             derivSocket.onopen = () => {
                 clearTimeout(timeout);
-                console.log("🔗 WebSocket Deriv connecté via OTP");
+                console.log("🔗 WebSocket ouvert");
 
-                isConnected = true;
-
-                if (loginIdEl) loginIdEl.textContent = derivLoginId;
-                if (balanceEl) balanceEl.textContent = "Chargement...";
-
-                setConnectionStatus("connected", `✅ Connecté (${derivLoginId})`);
-                if (connectionPanel) connectionPanel.classList.add("hidden");
-                if (positionPanel) positionPanel.classList.remove("hidden");
-                connectBtn.disabled = false;
-
-                derivSocket.send(JSON.stringify({ balance: 1, subscribe: 1 }));
-
-                sendTelegramNotification(
-                    `🤖 ARKAS Assistant\n` +
-                    `✅ Connexion Deriv réussie\n` +
-                    `Compte : ${derivLoginId}`
-                );
-
-                resolve();
+                /* Envoyer la demande d'autorisation */
+                derivSocket.send(JSON.stringify({
+                    authorize: derivToken
+                }));
             };
 
             derivSocket.onmessage = (event) => {
+
                 let data;
                 try { data = JSON.parse(event.data); } catch { return; }
+
+                /* ---- Réponse authorize ---- */
+                if (data.msg_type === "authorize") {
+
+                    if (data.error) {
+                        reject(new Error(data.error.message || "Token refusé"));
+                        return;
+                    }
+
+                    if (!data.authorize) {
+                        reject(new Error("Réponse authorize invalide"));
+                        return;
+                    }
+
+                    const auth = data.authorize;
+                    derivLoginId = auth.loginid;
+
+                    /* Mise à jour UI */
+                    if (loginIdEl) loginIdEl.textContent = auth.loginid;
+                    if (balanceEl) {
+                        balanceEl.textContent =
+                            `${auth.balance} ${auth.currency}`;
+                    }
+
+                    isConnected = true;
+
+                    setConnectionStatus("connected",
+                        `✅ Connecté (${auth.loginid})`);
+
+                    if (connectionPanel) connectionPanel.classList.add("hidden");
+                    if (positionPanel) positionPanel.classList.remove("hidden");
+                    connectBtn.disabled = false;
+
+                    console.log("✅ Connecté :", auth.loginid);
+
+                    sendTelegramNotification(
+                        `🤖 ARKAS Assistant\n` +
+                        `✅ Connexion Deriv réussie\n` +
+                        `Compte : ${auth.loginid}\n` +
+                        `Balance : ${auth.balance} ${auth.currency}`
+                    );
+
+                    resolve();
+                    return;
+                }
+
                 handleDerivMessage(data);
             };
 
-            derivSocket.onerror = () => {
+            derivSocket.onerror = (err) => {
                 clearTimeout(timeout);
-                reject(new Error("Erreur de connexion WebSocket."));
+                reject(new Error("Erreur WebSocket"));
             };
 
             derivSocket.onclose = () => {
                 isConnected = false;
                 isMonitoring = false;
-                setConnectionStatus("error", "⚠️ Déconnecté de Deriv.");
+                if (connectionStatus) {
+                    setConnectionStatus("error", "⚠️ Déconnecté de Deriv");
+                }
             };
         });
     }
@@ -182,7 +178,8 @@
 
         if (data.msg_type === "balance" && data.balance) {
             if (balanceEl) {
-                balanceEl.textContent = `${data.balance.balance} ${data.balance.currency}`;
+                balanceEl.textContent =
+                    `${data.balance.balance} ${data.balance.currency}`;
             }
             return;
         }
@@ -200,7 +197,8 @@
 
         if (data.error) {
             console.error("Deriv error:", data.error);
-            updateMonitorStatus("error", "❌ " + (data.error.message || "Erreur Deriv"));
+            updateMonitorStatus("error",
+                "❌ " + (data.error.message || "Erreur Deriv"));
         }
     }
 
@@ -250,13 +248,19 @@
         if (currentSubscription) {
             derivSocket.send(JSON.stringify({ forget: currentSubscription }));
         }
-        derivSocket.send(JSON.stringify({ ticks: symbol, subscribe: 1 }));
+
+        derivSocket.send(JSON.stringify({
+            ticks: symbol,
+            subscribe: 1
+        }));
 
         isMonitoring = true;
         if (startBtn) startBtn.classList.add("hidden");
         if (stopBtn) stopBtn.classList.remove("hidden");
 
-        updateMonitorStatus("success", `👀 Surveillance de ${symbol} active.`);
+        updateMonitorStatus("success",
+            `👀 Surveillance de ${symbol} active.`);
+
         sendTelegramNotification(`▶️ Surveillance démarrée sur ${symbol}`);
     }
 
@@ -397,13 +401,10 @@
         const userId = getCurrentUserId();
         if (!userId || !telegramLink) return;
 
-        // ⚠️ Remplace par le username de ton bot
         const botUsername = "Arkasscanai_bot";
-
         telegramLink.href = `https://t.me/${botUsername}?start=${userId}`;
     }
 
-    /* ---- Bouton Test ---- */
     if (telegramTestBtn) {
         telegramTestBtn.addEventListener("click", async () => {
 
@@ -419,14 +420,11 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         userId,
-                        message:
-                            "🧪 <b>Test ARKAS</b>\n\n" +
-                            "Si tu vois ce message, tes notifications fonctionnent !"
+                        message: "🧪 <b>Test ARKAS</b>\n\nSi tu vois ce message, tes notifications fonctionnent !"
                     })
                 });
 
                 telegramTestBtn.textContent = "✅ Envoyé !";
-
             } catch (err) {
                 telegramTestBtn.textContent = "❌ Échec";
             }
@@ -438,7 +436,6 @@
         });
     }
 
-    /* ---- Bouton Désactiver ---- */
     if (telegramDisableBtn) {
         telegramDisableBtn.addEventListener("click", async () => {
 
@@ -455,7 +452,6 @@
                 });
 
                 updateTelegramUI(false);
-
             } catch (err) {
                 alert("Erreur lors de la désactivation.");
             }

@@ -1,6 +1,9 @@
 /* =========================================================
    ARKAS SCAN AI V2 — ASSISTANT DE SURVEILLANCE DERIV
-   Version corrigée : Authentification OTP + Telegram multi-utilisateurs
+   OTP + Break-even + Notifications Telegram
+   Chemins API : /api/deriv-accounts, /api/deriv-otp,
+                 /api/notify-telegram, /api/telegram-status,
+                 /api/telegram-disable
    ========================================================= */
 
 (function () {
@@ -75,8 +78,8 @@
 
     async function connectViaOTP() {
 
-        // 1. Récupérer la liste des comptes
-        const accountsResponse = await fetch("/api/deriv/accounts", {
+        /* 1. Récupérer la liste des comptes */
+        const accountsResponse = await fetch("/api/deriv-accounts", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ derivToken })
@@ -101,8 +104,8 @@
 
         derivLoginId = targetAccount.account_id;
 
-        // 2. Obtenir l'URL OTP
-        const otpResponse = await fetch("/api/deriv/otp", {
+        /* 2. Obtenir l'URL OTP */
+        const otpResponse = await fetch("/api/deriv-otp", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -117,7 +120,7 @@
             throw new Error(otpData.error || "Impossible d'obtenir l'URL OTP.");
         }
 
-        // 3. Se connecter au WebSocket avec l'URL OTP
+        /* 3. Se connecter au WebSocket */
         return new Promise((resolve, reject) => {
 
             derivSocket = new WebSocket(otpData.wsUrl);
@@ -141,7 +144,6 @@
                 if (positionPanel) positionPanel.classList.remove("hidden");
                 connectBtn.disabled = false;
 
-                // Demander le solde
                 derivSocket.send(JSON.stringify({ balance: 1, subscribe: 1 }));
 
                 sendTelegramNotification(
@@ -173,7 +175,7 @@
     }
 
     /* =========================================================
-       GESTION MESSAGES DERIV
+       MESSAGES DERIV
        ========================================================= */
 
     function handleDerivMessage(data) {
@@ -203,7 +205,7 @@
     }
 
     /* =========================================================
-       SURVEILLANCE / BREAK-EVEN
+       SURVEILLANCE
        ========================================================= */
 
     function startMonitoring() {
@@ -292,7 +294,7 @@
     }
 
     /* =========================================================
-       ARRÊT SURVEILLANCE
+       ARRÊT
        ========================================================= */
 
     if (stopBtn) {
@@ -316,19 +318,16 @@
     if (startBtn) startBtn.addEventListener("click", startMonitoring);
 
     /* =========================================================
-       NOTIFICATIONS TELEGRAM (avec userId)
+       NOTIFICATIONS TELEGRAM
        ========================================================= */
 
     async function sendTelegramNotification(message) {
 
         const userId = getCurrentUserId();
-        if (!userId) {
-            console.warn("Aucun userId — notification Telegram annulée.");
-            return;
-        }
+        if (!userId) return;
 
         try {
-            await fetch("/api/notify/telegram", {
+            await fetch("/api/notify-telegram", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ userId, message })
@@ -352,7 +351,7 @@
         if (!userId || !telegramStatus) return;
 
         try {
-            const res = await fetch("/api/telegram/status", {
+            const res = await fetch("/api/telegram-status", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ userId })
@@ -415,7 +414,7 @@
             telegramTestBtn.textContent = "Envoi…";
 
             try {
-                await fetch("/api/notify/telegram", {
+                await fetch("/api/notify-telegram", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -449,7 +448,7 @@
             if (!confirm("Désactiver les notifications Telegram ?")) return;
 
             try {
-                await fetch("/api/telegram/disable", {
+                await fetch("/api/telegram-disable", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ userId })
@@ -499,7 +498,6 @@
             loadTelegramStatus();
             setupTelegramLink();
         } else {
-            // Attendre que Firebase Auth soit prêt
             setTimeout(() => {
                 loadTelegramStatus();
                 setupTelegramLink();

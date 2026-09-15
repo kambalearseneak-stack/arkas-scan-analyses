@@ -1,6 +1,5 @@
 /* =========================================================
    ARKAS SCAN AI V2 — STYLE COMPLET
-   Login + Dashboard + Scanner + Audit + Scénarios multiples
    ========================================================= */
 
 /* =========================================================
@@ -53,9 +52,7 @@
   padding: 0;
 }
 
-html {
-  scroll-behavior: smooth;
-}
+html { scroll-behavior: smooth; }
 
 body {
   min-height: 100vh;
@@ -84,9 +81,7 @@ body::before {
 }
 
 @media (min-width: 900px) {
-  body {
-    background-attachment: fixed;
-  }
+  body { background-attachment: fixed; }
 }
 
 
@@ -197,11 +192,7 @@ body::before {
 .hero {
   text-align: center;
   padding: 2rem 1rem;
-  background: linear-gradient(
-    135deg,
-    rgba(0, 230, 118, 0.08),
-    rgba(0, 230, 118, 0.02)
-  );
+  background: linear-gradient(135deg, rgba(0, 230, 118, 0.08), rgba(0, 230, 118, 0.02));
   border: 1px solid rgba(0, 230, 118, 0.15);
   border-radius: var(--radius-lg);
   backdrop-filter: var(--blur);
@@ -231,7 +222,8 @@ body::before {
 .scanner-card,
 .results-section,
 .method-section,
-.risk-notice {
+.risk-notice,
+.assistant-section {
   background: var(--bg-panel);
   padding: 1.5rem;
   border-radius: var(--radius-lg);
@@ -369,9 +361,7 @@ body::before {
   flex-wrap: wrap;
 }
 
-.preview-header strong {
-  color: var(--text-primary);
-}
+.preview-header strong { color: var(--text-primary); }
 
 #file-name {
   color: var(--text-muted);
@@ -399,7 +389,7 @@ body::before {
 
 
 /* =========================================================
-   9. DÉTECTION ACTIF / TIMEFRAME
+   9. DÉTECTION
    ========================================================= */
 .detected-info {
   display: grid;
@@ -442,7 +432,8 @@ body::before {
 }
 
 .primary-button,
-.secondary-button {
+.secondary-button,
+.btn-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -458,12 +449,14 @@ body::before {
   border: none;
 }
 
-.primary-button {
+.primary-button,
+.btn-primary {
   background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
   color: #000;
 }
 
-.primary-button:hover:not(:disabled) {
+.primary-button:hover:not(:disabled),
+.btn-primary:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: var(--shadow-glow);
 }
@@ -481,7 +474,8 @@ body::before {
 
 .primary-button:disabled,
 .secondary-button:disabled,
-.import-button:disabled {
+.import-button:disabled,
+.btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
@@ -530,9 +524,7 @@ body::before {
   margin-bottom: 0.35rem;
 }
 
-.empty-result p {
-  font-size: 0.85rem;
-}
+.empty-result p { font-size: 0.85rem; }
 
 .result-main {
   padding: 1.25rem;
@@ -700,10 +692,7 @@ body::before {
   margin-bottom: 0.6rem;
 }
 
-.audit-box ul {
-  list-style: none;
-  padding: 0;
-}
+.audit-box ul { list-style: none; padding: 0; }
 
 .audit-box li {
   font-size: 0.85rem;
@@ -740,9 +729,58 @@ body::before {
   margin-bottom: 1rem;
 }
 
+.verification-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.verification-item {
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-input);
+  background: var(--bg-input);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.verification-item span {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.verification-item strong { font-size: 0.78rem; font-weight: 700; }
+
+.verify-pass    { border-color: rgba(0, 230, 118, 0.4); }
+.verify-pass strong    { color: var(--color-primary); }
+.verify-fail    { border-color: rgba(255, 82, 82, 0.4); }
+.verify-fail strong    { color: var(--color-danger); }
+.verify-unclear { border-color: rgba(100, 116, 139, 0.4); }
+.verify-unclear strong { color: var(--text-muted); }
+
+.validation-probability {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background: rgba(0, 230, 118, 0.06);
+  border: 1px solid rgba(0, 230, 118, 0.3);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}
+
+.validation-probability span { color: var(--text-secondary); }
+.validation-probability strong { color: var(--color-primary); font-size: 1.1rem; font-weight: 900; }
+
 
 /* =========================================================
-   14. MÉTHODE ARKAS
+   14. MÉTHODE
    ========================================================= */
 .method-section h2 {
   font-size: 1.1rem;
@@ -835,9 +873,7 @@ footer {
   transition: opacity 0.3s ease;
 }
 
-.scan-image-wrapper.is-scanning .scan-overlay {
-  opacity: 1;
-}
+.scan-image-wrapper.is-scanning .scan-overlay { opacity: 1; }
 
 .scan-grid {
   position: absolute;
@@ -898,9 +934,7 @@ footer {
   animation: spin 0.8s linear infinite;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 .scan-label {
   font-size: 0.85rem;
@@ -960,9 +994,7 @@ footer {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -975,93 +1007,39 @@ footer {
    19. RESPONSIVE
    ========================================================= */
 @media (min-width: 640px) {
-  .scanner-actions {
-    flex-direction: row;
-  }
-
-  .scanner-actions button {
-    flex: 1;
-  }
-
-  .audit-columns {
-    grid-template-columns: 1fr 1fr;
-  }
+  .scanner-actions { flex-direction: row; }
+  .scanner-actions button { flex: 1; }
+  .audit-columns { grid-template-columns: 1fr 1fr; }
 }
 
 @media (min-width: 900px) {
-  .container {
-    padding: 2rem 1.5rem 4rem;
-    gap: 2rem;
-  }
-
-  .hero {
-    padding: 2.5rem 2rem;
-  }
-
-  .hero h2 {
-    font-size: 1.75rem;
-  }
-
+  .container { padding: 2rem 1.5rem 4rem; gap: 2rem; }
+  .hero { padding: 2.5rem 2rem; }
+  .hero h2 { font-size: 1.75rem; }
   .scanner-card,
   .results-section,
   .method-section,
-  .risk-notice {
-    padding: 2rem;
-  }
-
-  .drop-zone {
-    padding: 2.5rem 2rem;
-  }
+  .risk-notice,
+  .assistant-section { padding: 2rem; }
+  .drop-zone { padding: 2.5rem 2rem; }
 }
 
 @media (max-width: 480px) {
-  .topbar {
-    padding: 0.85rem 1rem;
-  }
-
-  .brand h1 {
-    font-size: 0.9rem;
-  }
-
-  .brand-logo {
-    width: 36px;
-    height: 36px;
-    font-size: 1.1rem;
-  }
-
-  #user-email {
-    display: none;
-  }
-
-  .container {
-    padding: 1rem 0.85rem 3rem;
-    gap: 1rem;
-  }
-
-  .hero {
-    padding: 1.5rem 1rem;
-  }
-
-  .hero h2 {
-    font-size: 1.2rem;
-  }
-
-  .detected-info {
-    grid-template-columns: 1fr;
-  }
-
-  .result-signal {
-    font-size: 1.25rem;
-  }
-
-  .method-grid {
-    grid-template-columns: 1fr 1fr;
-  }
+  .topbar { padding: 0.85rem 1rem; }
+  .brand h1 { font-size: 0.9rem; }
+  .brand-logo { width: 36px; height: 36px; font-size: 1.1rem; }
+  #user-email { display: none; }
+  .container { padding: 1rem 0.85rem 3rem; gap: 1rem; }
+  .hero { padding: 1.5rem 1rem; }
+  .hero h2 { font-size: 1.2rem; }
+  .detected-info { grid-template-columns: 1fr; }
+  .result-signal { font-size: 1.25rem; }
+  .method-grid { grid-template-columns: 1fr 1fr; }
 }
 
 
 /* =========================================================
-   20. PAGE DE CONNEXION / INSCRIPTION
+   20. PAGE DE CONNEXION
    ========================================================= */
 .login-container {
   position: relative;
@@ -1144,7 +1122,8 @@ footer {
   letter-spacing: 0.02em;
 }
 
-.form-group input {
+.form-group input,
+.form-group select {
   width: 100%;
   padding: 0.85rem 1rem;
   background: var(--bg-input);
@@ -1157,46 +1136,23 @@ footer {
   transition: all var(--transition);
 }
 
-.form-group input::placeholder {
-  color: var(--text-muted);
-}
+.form-group input::placeholder { color: var(--text-muted); }
+.form-group input:hover { border-color: #3b4a63; }
 
-.form-group input:hover {
-  border-color: #3b4a63;
-}
-
-.form-group input:focus {
+.form-group input:focus,
+.form-group select:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-glow);
   background: #111c33;
 }
 
-.btn-primary {
-  width: 100%;
-  padding: 0.85rem 1rem;
-  font-family: inherit;
-  font-size: 0.95rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
-  color: #000;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all var(--transition);
-  margin-top: 0.25rem;
+.form-group small {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.4;
 }
 
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-glow);
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
+.form-group small strong { color: var(--color-primary); }
 
 .toggle-container {
   margin-top: 1.5rem;
@@ -1205,9 +1161,7 @@ footer {
   color: var(--text-secondary);
 }
 
-.toggle-container p {
-  margin: 0;
-}
+.toggle-container p { margin: 0; }
 
 .toggle-container a {
   color: var(--color-primary);
@@ -1253,31 +1207,16 @@ footer {
 }
 
 @media (max-width: 480px) {
-  .login-container {
-    padding: 1rem;
-  }
-
-  .login-card {
-    padding: 2rem 1.35rem;
-  }
-
-  .login-brand h1 {
-    font-size: 1.3rem;
-  }
-
-  .brand-icon {
-    font-size: 2rem;
-  }
-
-  .login-subtitle {
-    font-size: 0.8rem;
-    margin-bottom: 1.5rem;
-  }
+  .login-container { padding: 1rem; }
+  .login-card { padding: 2rem 1.35rem; }
+  .login-brand h1 { font-size: 1.3rem; }
+  .brand-icon { font-size: 2rem; }
+  .login-subtitle { font-size: 0.8rem; margin-bottom: 1.5rem; }
 }
 
 
 /* =========================================================
-   21. BADGE STRATÉGIE + MARCHÉ
+   21. BADGE STRATÉGIE
    ========================================================= */
 .strategy-badge {
   display: inline-flex;
@@ -1302,36 +1241,20 @@ footer {
   letter-spacing: 0.05em;
 }
 
-.strat-smc {
-  border-color: rgba(0, 230, 118, 0.5);
-  background: rgba(0, 230, 118, 0.12);
-}
-
-.strat-hybrid {
-  border-color: rgba(41, 182, 246, 0.5);
-  background: rgba(41, 182, 246, 0.12);
-  color: var(--color-info);
-}
-
-.strat-pa {
-  border-color: rgba(255, 179, 0, 0.5);
-  background: rgba(255, 179, 0, 0.12);
-  color: var(--color-warning);
-}
-
-.strat-audit {
-  border-color: rgba(156, 39, 176, 0.5);
-  background: rgba(156, 39, 176, 0.12);
-  color: var(--color-purple);
-}
+.strat-smc    { border-color: rgba(0, 230, 118, 0.5);   background: rgba(0, 230, 118, 0.12); }
+.strat-hybrid { border-color: rgba(41, 182, 246, 0.5);  background: rgba(41, 182, 246, 0.12); color: var(--color-info); }
+.strat-pa     { border-color: rgba(255, 179, 0, 0.5);   background: rgba(255, 179, 0, 0.12);  color: var(--color-warning); }
+.strat-audit  { border-color: rgba(156, 39, 176, 0.5);  background: rgba(156, 39, 176, 0.12); color: var(--color-purple); }
+.strat-ict    { border-color: rgba(156, 39, 176, 0.5);  background: rgba(156, 39, 176, 0.12); color: var(--color-purple); }
 
 .strat-hybrid .market-type { background: rgba(41, 182, 246, 0.25); }
 .strat-pa     .market-type { background: rgba(255, 179, 0, 0.25); }
 .strat-audit  .market-type { background: rgba(156, 39, 176, 0.25); }
+.strat-ict    .market-type { background: rgba(156, 39, 176, 0.25); }
 
 
 /* =========================================================
-   22. BANNIÈRE CONFLUENCE (FOREX)
+   22. CONFLUENCE
    ========================================================= */
 .confluence-banner {
   padding: 0.75rem 1rem;
@@ -1342,33 +1265,12 @@ footer {
   animation: fadeIn 0.3s ease both;
 }
 
-.confluence-banner strong {
-  margin-right: 0.35rem;
-}
+.confluence-banner strong { margin-right: 0.35rem; }
 
-.confluence-aligned {
-  background: rgba(0, 230, 118, 0.08);
-  border-color: var(--color-primary);
-  color: #a5ffd0;
-}
-
-.confluence-partial {
-  background: rgba(255, 179, 0, 0.08);
-  border-color: var(--color-warning);
-  color: #ffe0a3;
-}
-
-.confluence-disagreement {
-  background: rgba(255, 82, 82, 0.08);
-  border-color: var(--color-danger);
-  color: #ffb3b3;
-}
-
-.confluence-neutral {
-  background: rgba(100, 116, 139, 0.08);
-  border-color: var(--text-muted);
-  color: var(--text-secondary);
-}
+.confluence-aligned      { background: rgba(0, 230, 118, 0.08); border-color: var(--color-primary); color: #a5ffd0; }
+.confluence-partial      { background: rgba(255, 179, 0, 0.08); border-color: var(--color-warning); color: #ffe0a3; }
+.confluence-disagreement { background: rgba(255, 82, 82, 0.08); border-color: var(--color-danger); color: #ffb3b3; }
+.confluence-neutral      { background: rgba(100, 116, 139, 0.08); border-color: var(--text-muted); color: var(--text-secondary); }
 
 
 /* =========================================================
@@ -1412,18 +1314,13 @@ footer {
   margin-bottom: 0.35rem;
 }
 
-.loader-box small {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
+.loader-box small { font-size: 0.75rem; color: var(--text-muted); }
 
-.hidden {
-  display: none !important;
-}
+.hidden { display: none !important; }
 
 
 /* =========================================================
-   24. SCÉNARIOS MULTIPLES (ZONES)
+   24. ZONES / SCÉNARIOS
    ========================================================= */
 .zones-section {
   margin-top: 1.5rem;
@@ -1445,9 +1342,7 @@ footer {
 }
 
 @media (min-width: 700px) {
-  .zones-grid {
-    grid-template-columns: 1fr 1fr;
-  }
+  .zones-grid { grid-template-columns: 1fr 1fr; }
 }
 
 .zone-card {
@@ -1488,10 +1383,7 @@ footer {
   font-size: 0.75rem;
 }
 
-.zone-sell .zone-id {
-  background: rgba(255, 82, 82, 0.15);
-  color: var(--color-danger);
-}
+.zone-sell .zone-id { background: rgba(255, 82, 82, 0.15); color: var(--color-danger); }
 
 .zone-type {
   font-size: 0.72rem;
@@ -1583,28 +1475,270 @@ footer {
 }
 
 .zone-trigger strong,
-.zone-invalidation strong {
+.zone-invalidation strong { color: var(--text-primary); }
+
+
+/* =========================================================
+   25. RISK MANAGER
+   ========================================================= */
+.risk-manager {
+  margin: 1.25rem 0;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, rgba(41, 182, 246, 0.06), rgba(0, 230, 118, 0.04));
+  border: 1px solid rgba(41, 182, 246, 0.3);
+  border-radius: var(--radius-md);
+}
+
+.risk-manager h3 {
+  font-size: 0.95rem;
+  color: var(--color-info);
+  margin-bottom: 0.85rem;
+  letter-spacing: 0.03em;
+}
+
+.risk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.6rem;
+}
+
+.risk-item {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.risk-item span {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.risk-item strong {
+  font-size: 0.85rem;
   color: var(--text-primary);
+  word-break: break-word;
+}
+
+.insurance-note {
+  margin-top: 0.85rem;
+  padding: 0.6rem 0.85rem;
+  background: rgba(255, 179, 0, 0.08);
+  border-left: 3px solid var(--color-warning);
+  border-radius: 4px;
+  font-size: 0.78rem;
+  color: #ffe0a3;
+}
+
+.insurance-note strong { color: var(--color-warning); }
+
+
+/* =========================================================
+   26. ASSISTANT DE SURVEILLANCE
+   ========================================================= */
+.assistant-section { margin-top: 1.5rem; }
+
+.assistant-subtitle {
+  font-size: 0.95rem;
+  color: var(--color-primary);
+  margin: 1.5rem 0 1rem;
+  letter-spacing: 0.03em;
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--border-input);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  transition: all var(--transition);
+}
+
+.connection-status .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.connection-status.disconnected { border-color: var(--border-input); }
+.connection-status.disconnected .dot { background: var(--text-muted); }
+
+.connection-status.loading {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+.connection-status.loading .dot {
+  background: var(--color-warning);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.connection-status.connected {
+  border-color: rgba(0, 230, 118, 0.5);
+  color: var(--color-primary);
+  background: rgba(0, 230, 118, 0.06);
+}
+.connection-status.connected .dot {
+  background: var(--color-primary);
+  box-shadow: 0 0 10px var(--color-primary);
+}
+
+.connection-status.error {
+  border-color: rgba(255, 82, 82, 0.5);
+  color: var(--color-danger);
+  background: rgba(255, 82, 82, 0.06);
+}
+.connection-status.error .dot {
+  background: var(--color-danger);
+  box-shadow: 0 0 10px var(--color-danger);
+}
+
+.position-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (max-width: 640px) {
+  .position-grid { grid-template-columns: 1fr; }
+}
+
+.assistant-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.assistant-actions button {
+  flex: 1;
+  min-width: 160px;
+}
+
+.monitor-status {
+  margin-top: 1.25rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  text-align: center;
+  border: 1px solid var(--border-input);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  transition: all var(--transition);
+  white-space: pre-line;
+  line-height: 1.5;
+}
+
+.monitor-status.status-success {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: rgba(0, 230, 118, 0.06);
+  box-shadow: 0 0 20px rgba(0, 230, 118, 0.15);
+}
+
+.monitor-status.status-error {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+  background: rgba(255, 82, 82, 0.06);
+}
+
+.monitor-status.status-info {
+  border-color: var(--color-info);
+  color: var(--color-info);
+  background: rgba(41, 182, 246, 0.06);
 }
 
 
 /* =========================================================
-   25. SCROLLBAR
+   27. TELEGRAM
    ========================================================= */
-::-webkit-scrollbar {
+.telegram-section {
+  margin: 1.25rem 0;
+  padding: 1.25rem;
+  background: rgba(41, 182, 246, 0.06);
+  border: 1px solid rgba(41, 182, 246, 0.3);
+  border-radius: var(--radius-md);
+}
+
+.telegram-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.85rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.85rem;
+}
+
+.telegram-status .dot {
   width: 8px;
   height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
 }
 
-::-webkit-scrollbar-track {
-  background: var(--bg-dark);
+.telegram-status.enabled {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
-::-webkit-scrollbar-thumb {
-  background: #2d3748;
-  border-radius: 4px;
+.telegram-status.enabled .dot {
+  background: var(--color-primary);
+  box-shadow: 0 0 8px var(--color-primary);
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #3b4a63;
+.telegram-status.disabled {
+  border-color: rgba(255, 82, 82, 0.4);
+  color: var(--color-danger);
 }
+
+.telegram-status.disabled .dot { background: var(--color-danger); }
+
+.telegram-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.telegram-actions a,
+.telegram-actions button {
+  flex: 1;
+  min-width: 140px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.telegram-hint {
+  display: block;
+  margin-top: 0.75rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+
+/* =========================================================
+   28. SCROLLBAR
+   ========================================================= */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-dark); }
+::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #3b4a63; }

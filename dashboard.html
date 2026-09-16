@@ -28,106 +28,142 @@
 
     <section class="hero">
         <h2>Analyse multi-timeframe avec ARKAS AI</h2>
-        <p>Importe jusqu'à 3 captures de timeframes différents. ARKAS détecte la confluence.</p>
+        <p>Sélectionne jusqu'à 3 captures de timeframes différents et détecte la confluence.</p>
     </section>
+
+    <!-- ================================================= -->
+    <!-- IMPORT MULTI-TIMEFRAME                            -->
+    <!-- ================================================= -->
 
     <section class="scanner-card">
         <div class="section-title">
             <span class="icon">📷</span>
             <div>
-                <h2>Captures multi-timeframe</h2>
-                <p>Sélectionne le timeframe de chaque image.</p>
+                <h2>Captures du graphique</h2>
+                <p>Choisis 1 à 3 images et donne un timeframe à chacune.</p>
             </div>
         </div>
 
-        <div class="tf-slot" data-slot="1">
-            <div class="tf-slot-header">
-                <span class="tf-slot-number">Image 1</span>
-                <select class="tf-select" id="tf-select-1">
-                    <option value="">— Timeframe —</option>
-                    <option value="M1">M1</option>
-                    <option value="M5">M5</option>
-                    <option value="M15">M15</option>
-                    <option value="M30">M30</option>
-                    <option value="H1">H1</option>
-                    <option value="H4">H4</option>
-                    <option value="D1">D1</option>
-                    <option value="W1">W1</option>
-                </select>
-            </div>
-            <input type="file" id="tf-file-1" class="tf-file-input" accept="image/jpeg,image/png,image/webp" hidden>
-            <div class="tf-drop" id="tf-drop-1" tabindex="0" role="button">
-                <div class="tf-drop-icon">📷</div>
-                <p>Clique pour importer</p>
-                <small>JPG • PNG • WEBP — 10 MB max</small>
-            </div>
-            <div class="tf-preview hidden" id="tf-preview-1">
-                <img id="tf-img-1" alt="Aperçu 1">
-                <button type="button" class="tf-remove-btn" data-slot="1">✕ Retirer</button>
-            </div>
+        <!-- INPUT UNIQUE MULTIPLE -->
+        <input
+            id="chart-files"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            hidden
+        >
+
+        <!-- ZONE D'IMPORT -->
+        <div
+            id="dropZone"
+            class="drop-zone"
+            tabindex="0"
+            role="button"
+            aria-label="Importer jusqu'à 3 captures"
+        >
+            <div class="upload-icon">📷</div>
+            <h3>Importer jusqu'à 3 captures</h3>
+            <p>Appuie ici pour choisir tes images</p>
+            <small>JPG • PNG • WEBP — 10 MB max par image</small>
+
+            <button
+                id="import-btn"
+                type="button"
+                class="import-button"
+            >
+                📷 IMPORTER DES CAPTURES
+            </button>
         </div>
 
-        <div class="tf-slot" data-slot="2">
-            <div class="tf-slot-header">
-                <span class="tf-slot-number">Image 2</span>
-                <select class="tf-select" id="tf-select-2">
-                    <option value="">— Timeframe —</option>
-                    <option value="M1">M1</option>
-                    <option value="M5">M5</option>
-                    <option value="M15">M15</option>
-                    <option value="M30">M30</option>
-                    <option value="H1">H1</option>
-                    <option value="H4">H4</option>
-                    <option value="D1">D1</option>
-                    <option value="W1">W1</option>
-                </select>
+        <!-- APERÇUS -->
+        <div id="preview-container" class="preview-container" style="display:none;">
+
+            <!-- SLOT 1 -->
+            <div class="tf-slot" data-slot="1">
+                <div class="tf-slot-header">
+                    <span class="tf-slot-number">Image 1</span>
+                    <select class="tf-select" id="tf-select-1">
+                        <option value="">— Timeframe —</option>
+                        <option value="M1">M1</option>
+                        <option value="M5">M5</option>
+                        <option value="M15">M15</option>
+                        <option value="M30">M30</option>
+                        <option value="H1">H1</option>
+                        <option value="H4">H4</option>
+                        <option value="D1">D1</option>
+                        <option value="W1">W1</option>
+                    </select>
+                </div>
+                <div class="tf-preview">
+                    <img id="tf-img-1" alt="Image 1">
+                    <button type="button" class="tf-remove-btn" data-slot="1">✕ Retirer</button>
+                </div>
             </div>
-            <input type="file" id="tf-file-2" class="tf-file-input" accept="image/jpeg,image/png,image/webp" hidden>
-            <div class="tf-drop" id="tf-drop-2" tabindex="0" role="button">
-                <div class="tf-drop-icon">📷</div>
-                <p>Clique pour importer</p>
-                <small>JPG • PNG • WEBP — 10 MB max</small>
+
+            <!-- SLOT 2 -->
+            <div class="tf-slot" data-slot="2">
+                <div class="tf-slot-header">
+                    <span class="tf-slot-number">Image 2</span>
+                    <select class="tf-select" id="tf-select-2">
+                        <option value="">— Timeframe —</option>
+                        <option value="M1">M1</option>
+                        <option value="M5">M5</option>
+                        <option value="M15">M15</option>
+                        <option value="M30">M30</option>
+                        <option value="H1">H1</option>
+                        <option value="H4">H4</option>
+                        <option value="D1">D1</option>
+                        <option value="W1">W1</option>
+                    </select>
+                </div>
+                <div class="tf-preview">
+                    <img id="tf-img-2" alt="Image 2">
+                    <button type="button" class="tf-remove-btn" data-slot="2">✕ Retirer</button>
+                </div>
             </div>
-            <div class="tf-preview hidden" id="tf-preview-2">
-                <img id="tf-img-2" alt="Aperçu 2">
-                <button type="button" class="tf-remove-btn" data-slot="2">✕ Retirer</button>
+
+            <!-- SLOT 3 -->
+            <div class="tf-slot" data-slot="3">
+                <div class="tf-slot-header">
+                    <span class="tf-slot-number">Image 3</span>
+                    <select class="tf-select" id="tf-select-3">
+                        <option value="">— Timeframe —</option>
+                        <option value="M1">M1</option>
+                        <option value="M5">M5</option>
+                        <option value="M15">M15</option>
+                        <option value="M30">M30</option>
+                        <option value="H1">H1</option>
+                        <option value="H4">H4</option>
+                        <option value="D1">D1</option>
+                        <option value="W1">W1</option>
+                    </select>
+                </div>
+                <div class="tf-preview">
+                    <img id="tf-img-3" alt="Image 3">
+                    <button type="button" class="tf-remove-btn" data-slot="3">✕ Retirer</button>
+                </div>
             </div>
+
         </div>
 
-        <div class="tf-slot" data-slot="3">
-            <div class="tf-slot-header">
-                <span class="tf-slot-number">Image 3</span>
-                <select class="tf-select" id="tf-select-3">
-                    <option value="">— Timeframe —</option>
-                    <option value="M1">M1</option>
-                    <option value="M5">M5</option>
-                    <option value="M15">M15</option>
-                    <option value="M30">M30</option>
-                    <option value="H1">H1</option>
-                    <option value="H4">H4</option>
-                    <option value="D1">D1</option>
-                    <option value="W1">W1</option>
-                </select>
-            </div>
-            <input type="file" id="tf-file-3" class="tf-file-input" accept="image/jpeg,image/png,image/webp" hidden>
-            <div class="tf-drop" id="tf-drop-3" tabindex="0" role="button">
-                <div class="tf-drop-icon">📷</div>
-                <p>Clique pour importer</p>
-                <small>JPG • PNG • WEBP — 10 MB max</small>
-            </div>
-            <div class="tf-preview hidden" id="tf-preview-3">
-                <img id="tf-img-3" alt="Aperçu 3">
-                <button type="button" class="tf-remove-btn" data-slot="3">✕ Retirer</button>
-            </div>
+        <!-- ACTIONS -->
+        <div class="scanner-actions" id="scanner-actions" style="display:none;">
+            <button id="analyze-btn" type="button" class="primary-button" disabled>
+                🔍 SCANNER LES CAPTURES
+            </button>
+            <button id="reset-btn" type="button" class="secondary-button">
+                🔄 RÉINITIALISER
+            </button>
         </div>
 
-        <div class="scanner-actions" id="scanner-actions">
-            <button id="analyze-btn" type="button" class="primary-button" disabled>🔍 SCANNER LES CAPTURES</button>
-            <button id="reset-btn" type="button" class="secondary-button">🔄 RÉINITIALISER</button>
+        <div id="analysis-status" class="analysis-status">
+            Importe au moins 1 capture.
         </div>
-
-        <div id="analysis-status" class="analysis-status">Importe au moins 1 capture avec son timeframe.</div>
     </section>
+
+    <!-- ================================================= -->
+    <!-- RÉSULTATS                                         -->
+    <!-- ================================================= -->
 
     <section id="results-section" class="results-section hidden">
         <div class="section-title">
@@ -139,6 +175,10 @@
         </div>
         <div id="results-content"></div>
     </section>
+
+    <!-- ================================================= -->
+    <!-- HISTORIQUE                                        -->
+    <!-- ================================================= -->
 
     <section id="history-section" class="results-section">
         <div class="section-title">
@@ -176,6 +216,10 @@
             </div>
         </div>
     </section>
+
+    <!-- ================================================= -->
+    <!-- MÉTHODE                                           -->
+    <!-- ================================================= -->
 
     <section class="method-section">
         <h2>🧠 Méthode ARKAS</h2>

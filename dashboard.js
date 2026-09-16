@@ -1,6 +1,6 @@
 /* =========================================================
-   ARKAS SCAN AI V2 — DASHBOARD MULTI-TIMEFRAME + SIMULATION
-   Détection auto du timeframe + Effet scan visible
+   ARKAS SCAN AI V2 — DASHBOARD
+   Multi-timeframe + Audit + Simulation
    ========================================================= */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -16,16 +16,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let isProcessing = false;
 
-    /* =========================================================
-       RÉFÉRENCES DOM
-       ========================================================= */
-
     const fileInput = document.getElementById("chart-files");
     const importBtn = document.getElementById("import-btn");
     const dropZone = document.getElementById("dropZone");
     const previewContainer = document.getElementById("preview-container");
     const scannerActions = document.getElementById("scanner-actions");
     const analyzeBtn = document.getElementById("analyze-btn");
+    const auditBtn = document.getElementById("audit-btn");
     const resetBtn = document.getElementById("reset-btn");
     const analysisStatus = document.getElementById("analysis-status");
     const resultsSection = document.getElementById("results-section");
@@ -76,15 +73,10 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    /* =========================================================
-       COMPRESSION
-       ========================================================= */
-
     function compressImage(file, maxWidth = 1600, quality = 0.85) {
         return new Promise((resolve, reject) => {
             const img = new Image();
             const url = URL.createObjectURL(file);
-
             img.onload = () => {
                 URL.revokeObjectURL(url);
                 let { width, height } = img;
@@ -98,35 +90,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 const ctx = canvas.getContext("2d");
                 ctx.drawImage(img, 0, 0, width, height);
                 canvas.toBlob(
-                    (blob) => blob ? resolve(blob) : reject(new Error("Compression échouée")),
-                    "image/jpeg",
-                    quality
+                    (blob) => blob ? resolve(blob) : reject(new Error("Erreur")),
+                    "image/jpeg", quality
                 );
             };
-
-            img.onerror = () => reject(new Error("Lecture échouée"));
+            img.onerror = () => reject(new Error("Erreur"));
             img.src = url;
         });
     }
 
-    /* =========================================================
-       TRAITEMENT DES FICHIERS
-       ========================================================= */
-
     async function handleFiles(files) {
-
         const allowed = ["image/jpeg", "image/png", "image/webp"];
-
-        for (let i = 1; i <= MAX_IMAGES; i++) {
-            slots[i] = { base64: null, mimeType: null };
-        }
+        for (let i = 1; i <= MAX_IMAGES; i++) slots[i] = { base64: null, mimeType: null };
 
         showStatus(`📷 Traitement de ${files.length} image(s)…`, "info");
 
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const slotN = i + 1;
-
             if (!allowed.includes(file.type)) continue;
             if (file.size > MAX_SIZE) continue;
 
@@ -135,9 +116,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const base64 = await blobToDataURL(compressed);
                 slots[slotN].base64 = base64;
                 slots[slotN].mimeType = "image/jpeg";
-            } catch (err) {
-                console.error(err);
-            }
+            } catch (err) { console.error(err); }
         }
 
         renderPreviews();
@@ -153,27 +132,18 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    /* =========================================================
-       PREVIEWS
-       ========================================================= */
-
     function renderPreviews() {
-
         let hasAny = false;
-
         for (let i = 1; i <= MAX_IMAGES; i++) {
-
             const slotEl = document.querySelector(`.tf-slot[data-slot="${i}"]`);
             const imgEl = document.getElementById(`tf-img-${i}`);
             const detectedEl = document.getElementById(`tf-detected-${i}`);
-
             if (!slotEl) continue;
 
             if (slots[i].base64) {
                 if (imgEl) imgEl.src = slots[i].base64;
                 slotEl.style.display = "block";
                 hasAny = true;
-
                 if (detectedEl) {
                     detectedEl.classList.add("hidden");
                     detectedEl.textContent = "Détection...";
@@ -194,10 +164,6 @@ document.addEventListener("DOMContentLoaded", () => {
             scannerActions.style.display = "none";
         }
     }
-
-    /* =========================================================
-       RETIRER
-       ========================================================= */
 
     document.querySelectorAll(".tf-remove-btn").forEach((btn) => {
         btn.addEventListener("click", (e) => {
@@ -228,35 +194,34 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    /* =========================================================
-       BOUTON ANALYSER
-       ========================================================= */
-
     function updateAnalyzeButton() {
         const filled = Object.values(slots).filter(s => s.base64).length;
         const can = filled >= 1 && !isProcessing;
 
         if (analyzeBtn) analyzeBtn.disabled = !can;
+        if (auditBtn) auditBtn.disabled = !can;
 
         if (filled === 0) {
             showStatus("Importe au moins 1 capture.", "info");
         } else {
-            showStatus(`✅ ${filled} image(s) prête(s). Clique sur Scanner.`, "success");
+            showStatus(`✅ ${filled} image(s) prête(s).`, "success");
         }
     }
-
-    /* =========================================================
-       ANALYSE
-       ========================================================= */
 
     if (analyzeBtn) {
         analyzeBtn.addEventListener("click", async () => {
             if (isProcessing) return;
-            await analyzeMultiTF();
+            await analyzeMultiTF(false);
         });
     }
 
-    /* ---- Effet scan sur les images ---- */
+    if (auditBtn) {
+        auditBtn.addEventListener("click", async () => {
+            if (isProcessing) return;
+            await analyzeMultiTF(true);
+        });
+    }
+
     function startScanEffect() {
         for (let i = 1; i <= MAX_IMAGES; i++) {
             if (!slots[i].base64) continue;
@@ -272,17 +237,14 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    async function analyzeMultiTF() {
+    async function analyzeMultiTF(isAudit = false) {
 
         const images = [];
-
         for (let i = 1; i <= MAX_IMAGES; i++) {
             if (!slots[i].base64) continue;
-
             const clean = slots[i].base64.includes(",")
                 ? slots[i].base64.split(",")[1]
                 : slots[i].base64;
-
             images.push({
                 imageBase64: clean,
                 mimeType: slots[i].mimeType || "image/jpeg"
@@ -298,9 +260,8 @@ document.addEventListener("DOMContentLoaded", () => {
         setButtonsDisabled(true);
         resultsSection.classList.add("hidden");
         globalLoader.classList.remove("hidden");
-        showStatus("🔍 Analyse en cours…", "loading");
+        showStatus(isAudit ? "🧪 Audit en cours…" : "🔍 Analyse en cours…", "loading");
 
-        /* Démarrage de l'effet scan */
         startScanEffect();
 
         try {
@@ -311,23 +272,26 @@ document.addEventListener("DOMContentLoaded", () => {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 signal: controller.signal,
-                body: JSON.stringify({ mode: "multi-tf", images })
+                body: JSON.stringify({
+                    mode: isAudit ? "audit" : "multi-tf",
+                    images: isAudit ? null : images,
+                    imageBase64: isAudit ? images[0].imageBase64 : null,
+                    mimeType: isAudit ? images[0].mimeType : null
+                })
             });
 
             clearTimeout(timeoutId);
 
             let data;
             try { data = await response.json(); }
-            catch { throw new Error("Réponse serveur invalide."); }
+            catch { throw new Error("Réponse invalide."); }
 
             if (!response.ok) throw new Error(data?.error || `Erreur ${response.status}`);
             if (!data) throw new Error("Aucune réponse.");
 
-            /* Afficher les timeframes détectés sur chaque image */
-            displayDetectedTimeframes(data);
-
-            renderResults(data);
-            showStatus("✅ Analyse terminée.", "success");
+            if (!isAudit) displayDetectedTimeframes(data);
+            renderResults(data, isAudit);
+            showStatus(isAudit ? "✅ Audit terminé." : "✅ Analyse terminée.", "success");
 
         } catch (error) {
             console.error(error);
@@ -340,26 +304,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    /* =========================================================
-       AFFICHAGE DES TIMEFRAMES DÉTECTÉS
-       ========================================================= */
-
     function displayDetectedTimeframes(data) {
-
         const tfAnalysis = Array.isArray(data.tf_analysis) ? data.tf_analysis : [];
-
         for (let i = 1; i <= MAX_IMAGES; i++) {
-
             const detectedEl = document.getElementById(`tf-detected-${i}`);
             if (!detectedEl) continue;
-
-            if (!slots[i].base64) {
-                detectedEl.classList.add("hidden");
-                continue;
-            }
-
+            if (!slots[i].base64) { detectedEl.classList.add("hidden"); continue; }
             const tf = tfAnalysis[i - 1];
-
             if (tf && tf.timeframe) {
                 detectedEl.textContent = `📊 ${tf.timeframe} — ${tf.bias || "—"}`;
                 detectedEl.classList.remove("hidden");
@@ -371,13 +322,15 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    /* =========================================================
-       RENDU RÉSULTATS
-       ========================================================= */
-
-    function renderResults(data) {
-
+    function renderResults(data, isAudit = false) {
         resultsSection.classList.remove("hidden");
+
+        if (isAudit) {
+            resultsContent.innerHTML = renderAuditResults(data);
+            attachCopyButton(data, true);
+            resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+            return;
+        }
 
         const signal = data.signal || "WAIT";
         const signalClass = getSignalClass(signal);
@@ -422,9 +375,7 @@ document.addEventListener("DOMContentLoaded", () => {
         resultsContent.innerHTML = `
             <div class="result-main ${signalClass}">
                 <div class="result-signal">${escapeHtml(signal)}</div>
-                <div class="result-meta">
-                    Actif : <strong>${escapeHtml(data.asset || "—")}</strong>
-                </div>
+                <div class="result-meta">Actif : <strong>${escapeHtml(data.asset || "—")}</strong></div>
                 <div class="strategy-badge">
                     ${escapeHtml(data.strategy_applied || "MULTI_TF")}
                     <span class="market-type">${escapeHtml(data.market_type || "—")}</span>
@@ -455,18 +406,88 @@ document.addEventListener("DOMContentLoaded", () => {
             ${zonesHtml}
 
             <div class="copy-signal-area">
-                <button type="button" class="copy-signal-btn" id="copy-signal-btn">
-                    📋 Copier le signal
-                </button>
-                <button type="button" class="copy-signal-btn simulate-btn" id="simulate-btn">
-                    🎮 Simuler ce trade
-                </button>
+                <button type="button" class="copy-signal-btn" id="copy-signal-btn">📋 Copier le signal</button>
+                <button type="button" class="copy-signal-btn simulate-btn" id="simulate-btn">🎮 Simuler ce trade</button>
             </div>
         `;
 
-        attachCopyButton(data);
+        attachCopyButton(data, false);
         attachSimulateButton(data);
         resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function renderAuditResults(data) {
+        const audit = data.audit || {};
+        const status = audit.status || "UNCLEAR";
+        const verdict = audit.verdict || "Audit non disponible.";
+        const corrected = audit.corrected_trade || {};
+
+        const statusInfo = getAuditStatus(status);
+
+        return `
+            <div class="audit-verdict ${statusInfo.className}">
+                <div class="audit-icon">${statusInfo.icon}</div>
+                <div>
+                    <div class="audit-title">${escapeHtml(statusInfo.title)}</div>
+                    <div class="audit-description">${escapeHtml(verdict)}</div>
+                </div>
+            </div>
+
+            <div class="audit-columns">
+                <div class="audit-box">
+                    <h3>✅ Points positifs</h3>
+                    ${renderList(audit.strengths)}
+                </div>
+                <div class="audit-box">
+                    <h3>⚠️ Points à corriger</h3>
+                    ${renderList(audit.errors)}
+                </div>
+            </div>
+
+            <div class="audit-box correction-box">
+                <h3>🛠️ Corrections proposées</h3>
+                ${renderList(audit.corrections)}
+            </div>
+
+            <div class="corrected-trade">
+                <h3>🎯 Analyse corrigée</h3>
+                <div class="result-grid">
+                    ${resultCard("Signal", safe(corrected.signal, "WAIT"))}
+                    ${resultCard("Entry", formatNumber(corrected.entry))}
+                    ${resultCard("SL", formatNumber(corrected.sl))}
+                    ${resultCard("TP1", formatNumber(corrected.tp1))}
+                    ${resultCard("TP2", formatNumber(corrected.tp2))}
+                    ${resultCard("TP3", formatNumber(corrected.tp3))}
+                    ${resultCard("RR", safe(corrected.rr, "—"))}
+                </div>
+                <div class="validation-probability">
+                    <span>Probabilité de validation :</span>
+                    <strong>${escapeHtml(String(corrected.validation_probability ?? "—"))}%</strong>
+                </div>
+                <div class="copy-signal-area">
+                    <button type="button" class="copy-signal-btn" id="copy-signal-btn">
+                        📋 Copier le signal corrigé
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderList(items) {
+        if (!Array.isArray(items) || !items.length) {
+            return `<p class="empty-list">Aucun élément.</p>`;
+        }
+        return `<ul>${items.map(i => `<li>${escapeHtml(String(i))}</li>`).join("")}</ul>`;
+    }
+
+    function getAuditStatus(status) {
+        switch (String(status).toUpperCase()) {
+            case "VALIDATED": return { icon: "✅", title: "ANALYSE VALIDÉE", className: "audit-valid" };
+            case "CORRECT": return { icon: "⚠️", title: "ANALYSE À CORRIGER", className: "audit-correct" };
+            case "PREMATURE": return { icon: "🟡", title: "ENTRÉE PRÉMATURÉE", className: "audit-premature" };
+            case "INVALID": return { icon: "❌", title: "ANALYSE INVALIDÉE", className: "audit-invalid" };
+            default: return { icon: "❓", title: "ANALYSE NON DÉTERMINÉE", className: "audit-unclear" };
+        }
     }
 
     function renderConfluence(status) {
@@ -503,74 +524,70 @@ document.addEventListener("DOMContentLoaded", () => {
         `;
     }
 
-    /* =========================================================
-       COPIER LE SIGNAL
-       ========================================================= */
-
-    function attachCopyButton(data) {
+    function attachCopyButton(data, isAudit) {
         const btn = document.getElementById("copy-signal-btn");
         if (!btn) return;
-
         btn.addEventListener("click", async () => {
-            const text = buildSignalText(data);
+            const text = isAudit ? buildAuditText(data) : buildSignalText(data);
             try {
                 await navigator.clipboard.writeText(text);
                 btn.textContent = "✅ Signal copié !";
-                saveToHistory(data);
-                renderHistory();
+                if (!isAudit) { saveToHistory(data); renderHistory(); }
                 setTimeout(() => { btn.textContent = "📋 Copier le signal"; }, 2000);
-            } catch (err) {
-                btn.textContent = "❌ Copie impossible";
-            }
+            } catch (err) { btn.textContent = "❌ Copie impossible"; }
         });
     }
 
     function buildSignalText(data) {
         return [
-            "🎯 ARKAS SIGNAL",
-            "",
+            "🎯 ARKAS SIGNAL", "",
             `Actif : ${data.asset || "—"}`,
             `Signal : ${data.signal || "WAIT"}`,
-            `Direction : ${data.direction || "—"}`,
-            "",
+            `Direction : ${data.direction || "—"}`, "",
             `Entry : ${data.entry ?? "—"}`,
             `SL : ${data.sl ?? "—"}`,
             `TP1 : ${data.tp1 ?? "—"}`,
             `TP2 : ${data.tp2 ?? "—"}`,
             `TP3 : ${data.tp3 ?? "—"}`,
-            `RR : ${data.rr ?? "—"}`,
-            "",
+            `RR : ${data.rr ?? "—"}`, "",
             `Confiance : ${data.confidence_percent ?? "—"}%`,
-            `Score : ${data.arkas_score ?? "—"}`,
-            "",
+            `Score : ${data.arkas_score ?? "—"}`, "",
             "Généré par ARKAS SCAN AI"
         ].join("\n");
     }
 
-    /* =========================================================
-       SIMULER LE TRADE
-       ========================================================= */
+    function buildAuditText(data) {
+        const audit = data.audit || {};
+        const c = audit.corrected_trade || {};
+        return [
+            "🧪 ARKAS AUDIT", "",
+            `Statut : ${audit.status || "—"}`,
+            `Verdict : ${audit.verdict || "—"}`, "",
+            "Analyse corrigée :",
+            `Signal : ${c.signal ?? "—"}`,
+            `Entry : ${c.entry ?? "—"}`,
+            `SL : ${c.sl ?? "—"}`,
+            `TP1 : ${c.tp1 ?? "—"}`,
+            `RR : ${c.rr ?? "—"}`, "",
+            `Probabilité : ${c.validation_probability ?? "—"}%`, "",
+            "Généré par ARKAS SCAN AI"
+        ].join("\n");
+    }
 
     function attachSimulateButton(data) {
         const btn = document.getElementById("simulate-btn");
         if (!btn) return;
-
         if (!window.ARKAS_SIMULATOR) {
             btn.disabled = true;
             btn.textContent = "🎮 Simulateur indisponible";
             return;
         }
-
         btn.addEventListener("click", () => {
             const result = window.ARKAS_SIMULATOR.addTrade(data);
-
             if (result.success) {
                 btn.textContent = "✅ Trade ajouté !";
                 btn.disabled = true;
-                setTimeout(() => {
-                    btn.textContent = "🎮 Simuler ce trade";
-                    btn.disabled = false;
-                }, 2500);
+                setTimeout(() => { btn.textContent = "🎮 Simuler ce trade"; btn.disabled = false; }, 2500);
                 renderSimulation();
             } else {
                 alert(result.message);
@@ -578,12 +595,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    /* =========================================================
-       RENDU SIMULATION
-       ========================================================= */
-
     function renderSimulation() {
-
         const container = document.getElementById("simulation-content");
         const statsEl = {
             total: document.getElementById("sim-total"),
@@ -592,7 +604,6 @@ document.addEventListener("DOMContentLoaded", () => {
             pending: document.getElementById("sim-pending"),
             rate: document.getElementById("sim-rate")
         };
-
         if (!container || !window.ARKAS_SIMULATOR) return;
 
         const trades = window.ARKAS_SIMULATOR.getTrades();
@@ -605,43 +616,27 @@ document.addEventListener("DOMContentLoaded", () => {
         if (statsEl.rate) statsEl.rate.textContent = stats.winRate ? `${stats.winRate}%` : "—";
 
         if (!trades.length) {
-            container.innerHTML = `
-                <div class="empty-result">
-                    <div>🎮</div>
-                    <h3>Aucune simulation en cours</h3>
-                    <p>Copie un signal et clique "Simuler ce trade".</p>
-                </div>
-            `;
+            container.innerHTML = `<div class="empty-result"><div>🎮</div><h3>Aucune simulation</h3><p>Copie un signal et clique "Simuler".</p></div>`;
             return;
         }
 
         container.innerHTML = `
             <div class="simulation-list">
                 ${trades.map(t => {
-                    const statusClass = t.status === "WIN" ? "sim-win" :
-                                       t.status === "LOSS" ? "sim-loss" : "sim-pending";
-                    const statusLabel = t.status === "WIN" ? "🎉 GAGNÉ" :
-                                       t.status === "LOSS" ? "😢 PERDU" : "⏳ EN COURS";
-
+                    const cls = t.status === "WIN" ? "sim-win" : t.status === "LOSS" ? "sim-loss" : "sim-pending";
+                    const lbl = t.status === "WIN" ? "🎉 GAGNÉ" : t.status === "LOSS" ? "😢 PERDU" : "⏳ EN COURS";
                     return `
-                        <div class="simulation-item ${statusClass}">
+                        <div class="simulation-item ${cls}">
                             <div class="sim-line">
                                 <strong>${escapeHtml(t.asset)}</strong>
-                                <span class="sim-signal ${t.direction === "BUY" ? "signal-buy" : "signal-sell"}">
-                                    ${escapeHtml(t.direction)}
-                                </span>
-                                <span class="sim-status">${statusLabel}</span>
+                                <span class="sim-signal ${t.direction === "BUY" ? "signal-buy" : "signal-sell"}">${escapeHtml(t.direction)}</span>
+                                <span class="sim-status">${lbl}</span>
                             </div>
                             <div class="sim-line">
                                 <span>Entry : ${t.entry}</span>
                                 <span>SL : ${t.sl}</span>
                                 <span>TP1 : ${t.tp1}</span>
                             </div>
-                            ${t.closePrice ? `
-                                <div class="sim-line">
-                                    <small>Prix de clôture : ${t.closePrice}</small>
-                                </div>
-                            ` : ""}
                         </div>
                     `;
                 }).join("")}
@@ -649,13 +644,7 @@ document.addEventListener("DOMContentLoaded", () => {
         `;
     }
 
-    window.addEventListener("arkas:trade-result", () => {
-        renderSimulation();
-    });
-
-    /* =========================================================
-       HISTORIQUE
-       ========================================================= */
+    window.addEventListener("arkas:trade-result", () => renderSimulation());
 
     function saveToHistory(data) {
         try {
@@ -666,11 +655,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 asset: data.asset || "—",
                 signal: data.signal || "WAIT",
                 direction: data.direction || "—",
-                entry: data.entry,
-                sl: data.sl,
-                tp1: data.tp1,
-                tp2: data.tp2,
-                tp3: data.tp3,
+                entry: data.entry, sl: data.sl,
+                tp1: data.tp1, tp2: data.tp2, tp3: data.tp3,
                 rr: data.rr,
                 confidence: data.confidence_percent,
                 score: data.arkas_score,
@@ -683,6 +669,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function renderHistory() {
         const container = document.getElementById("history-content");
+        if (!container) return;
+
+        let history = [];
+        try { history = JSON.parse(localStorage.getItem("arkas_signals_history") || "[]"); } catch {}
+
         const statsEl = {
             total: document.getElementById("stat-total"),
             win: document.getElementById("stat-win"),
@@ -690,19 +681,8 @@ document.addEventListener("DOMContentLoaded", () => {
             rate: document.getElementById("stat-rate")
         };
 
-        if (!container) return;
-
-        let history = [];
-        try { history = JSON.parse(localStorage.getItem("arkas_signals_history") || "[]"); } catch {}
-
         if (!history.length) {
-            container.innerHTML = `
-                <div class="empty-result">
-                    <div>📭</div>
-                    <h3>Aucun signal enregistré</h3>
-                    <p>Les signaux copiés apparaîtront ici.</p>
-                </div>
-            `;
+            container.innerHTML = `<div class="empty-result"><div>📭</div><h3>Aucun signal</h3><p>Les signaux copiés apparaîtront ici.</p></div>`;
             if (statsEl.total) statsEl.total.textContent = "0";
             if (statsEl.win) statsEl.win.textContent = "0";
             if (statsEl.loss) statsEl.loss.textContent = "0";
@@ -728,9 +708,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             <strong>${escapeHtml(h.asset)}</strong>
                             <span class="history-signal">${escapeHtml(h.signal)}</span>
                         </div>
-                        <div class="history-line">
-                            <small>${new Date(h.date).toLocaleString("fr-FR")}</small>
-                        </div>
+                        <div class="history-line"><small>${new Date(h.date).toLocaleString("fr-FR")}</small></div>
                         <div class="history-line">
                             <span>Entry : ${h.entry ?? "—"}</span>
                             <span>SL : ${h.sl ?? "—"}</span>
@@ -742,12 +720,9 @@ document.addEventListener("DOMContentLoaded", () => {
         `;
     }
 
-    /* =========================================================
-       HELPERS
-       ========================================================= */
-
     function setButtonsDisabled(d) {
         if (analyzeBtn) analyzeBtn.disabled = d;
+        if (auditBtn) auditBtn.disabled = d;
         if (resetBtn) resetBtn.disabled = d;
         if (importBtn) importBtn.disabled = d;
     }
@@ -791,10 +766,6 @@ document.addEventListener("DOMContentLoaded", () => {
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
     }
-
-    /* =========================================================
-       INITIALISATION
-       ========================================================= */
 
     renderPreviews();
     updateAnalyzeButton();

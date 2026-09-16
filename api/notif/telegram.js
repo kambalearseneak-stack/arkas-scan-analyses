@@ -36,7 +36,7 @@ export default async function handler(req, res) {
         }
 
         if (!message || typeof message !== "string") {
-            return res.status(400).json({ error: "Message invalide" });
+            return res.status(400).json({ error: "Message invalide" })
         }
 
         /* ---- Récupérer le chat_id de l'utilisateur ---- */

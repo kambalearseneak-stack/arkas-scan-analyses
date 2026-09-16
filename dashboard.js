@@ -1,6 +1,5 @@
 /* =========================================================
-   ARKAS SCAN AI V2 — DASHBOARD MULTI-TIMEFRAME
-   Upload multiple + Attribution timeframe + Analyse
+   ARKAS SCAN AI V2 — DASHBOARD MULTI-TIMEFRAME + SIMULATION
    ========================================================= */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -15,6 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     let isProcessing = false;
+    let lastAnalysis = null;
 
     /* =========================================================
        RÉFÉRENCES DOM
@@ -45,17 +45,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (dropZone) {
-
         dropZone.addEventListener("click", (e) => {
             if (e.target.closest("button")) return;
             if (!isProcessing) fileInput.click();
-        });
-
-        dropZone.addEventListener("keydown", (e) => {
-            if ((e.key === "Enter" || e.key === " ") && !isProcessing) {
-                e.preventDefault();
-                fileInput.click();
-            }
         });
 
         dropZone.addEventListener("dragover", (e) => {
@@ -71,7 +63,6 @@ document.addEventListener("DOMContentLoaded", () => {
             e.preventDefault();
             dropZone.classList.remove("drag-over");
             if (isProcessing) return;
-
             const files = Array.from(e.dataTransfer.files).slice(0, MAX_IMAGES);
             if (files.length) handleFiles(files);
         });
@@ -96,20 +87,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
             img.onload = () => {
                 URL.revokeObjectURL(url);
-
                 let { width, height } = img;
                 if (width > maxWidth) {
                     height = Math.round((height * maxWidth) / width);
                     width = maxWidth;
                 }
-
                 const canvas = document.createElement("canvas");
                 canvas.width = width;
                 canvas.height = height;
-
                 const ctx = canvas.getContext("2d");
                 ctx.drawImage(img, 0, 0, width, height);
-
                 canvas.toBlob(
                     (blob) => blob ? resolve(blob) : reject(new Error("Compression échouée")),
                     "image/jpeg",
@@ -130,7 +117,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const allowed = ["image/jpeg", "image/png", "image/webp"];
 
-        // Reset
         for (let i = 1; i <= MAX_IMAGES; i++) {
             slots[i] = { base64: null, mimeType: null };
         }
@@ -141,26 +127,16 @@ document.addEventListener("DOMContentLoaded", () => {
             const file = files[i];
             const slotN = i + 1;
 
-            if (!allowed.includes(file.type)) {
-                showStatus(`❌ Image ${slotN} : format non supporté.`, "error");
-                continue;
-            }
-
-            if (file.size > MAX_SIZE) {
-                showStatus(`❌ Image ${slotN} : trop lourde (max 10 MB).`, "error");
-                continue;
-            }
+            if (!allowed.includes(file.type)) continue;
+            if (file.size > MAX_SIZE) continue;
 
             try {
                 const compressed = await compressImage(file);
                 const base64 = await blobToDataURL(compressed);
-
                 slots[slotN].base64 = base64;
                 slots[slotN].mimeType = "image/jpeg";
-
             } catch (err) {
                 console.error(err);
-                showStatus(`❌ Erreur image ${slotN}.`, "error");
             }
         }
 
@@ -178,7 +154,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /* =========================================================
-       AFFICHAGE DES APERÇUS
+       PREVIEWS
        ========================================================= */
 
     function renderPreviews() {
@@ -211,20 +187,10 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    /* =========================================================
-       TIMEFRAME
-       ========================================================= */
-
     for (let i = 1; i <= MAX_IMAGES; i++) {
         const selectEl = document.getElementById(`tf-select-${i}`);
-        if (selectEl) {
-            selectEl.addEventListener("change", updateAnalyzeButton);
-        }
+        if (selectEl) selectEl.addEventListener("change", updateAnalyzeButton);
     }
-
-    /* =========================================================
-       RETIRER UNE IMAGE
-       ========================================================= */
 
     document.querySelectorAll(".tf-remove-btn").forEach((btn) => {
         btn.addEventListener("click", (e) => {
@@ -235,31 +201,21 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     function removeSlot(n) {
-
         slots[n] = { base64: null, mimeType: null };
-
         const selectEl = document.getElementById(`tf-select-${n}`);
         if (selectEl) selectEl.value = "";
-
         renderPreviews();
         updateAnalyzeButton();
     }
 
-    /* =========================================================
-       RÉINITIALISER
-       ========================================================= */
-
     if (resetBtn) {
         resetBtn.addEventListener("click", () => {
-
             for (let i = 1; i <= MAX_IMAGES; i++) {
                 slots[i] = { base64: null, mimeType: null };
                 const selectEl = document.getElementById(`tf-select-${i}`);
                 if (selectEl) selectEl.value = "";
             }
-
             if (fileInput) fileInput.value = "";
-
             resultsSection.classList.add("hidden");
             renderPreviews();
             updateAnalyzeButton();
@@ -272,7 +228,6 @@ document.addEventListener("DOMContentLoaded", () => {
        ========================================================= */
 
     function updateAnalyzeButton() {
-
         const filled = [];
 
         for (let i = 1; i <= MAX_IMAGES; i++) {
@@ -282,7 +237,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         const totalFilled = Object.values(slots).filter(s => s.base64).length;
-
         const can = filled.length >= 1 && !isProcessing;
         analyzeBtn.disabled = !can;
 
@@ -312,7 +266,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         for (let i = 1; i <= MAX_IMAGES; i++) {
             if (!slots[i].base64) continue;
-
             const tf = document.getElementById(`tf-select-${i}`)?.value;
             if (!tf) continue;
 
@@ -346,10 +299,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 signal: controller.signal,
-                body: JSON.stringify({
-                    mode: "multi-tf",
-                    images: images
-                })
+                body: JSON.stringify({ mode: "multi-tf", images })
             });
 
             clearTimeout(timeoutId);
@@ -361,6 +311,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!response.ok) throw new Error(data?.error || `Erreur ${response.status}`);
             if (!data) throw new Error("Aucune réponse.");
 
+            lastAnalysis = data;
             renderResults(data);
             showStatus("✅ Analyse terminée.", "success");
 
@@ -461,10 +412,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 <button type="button" class="copy-signal-btn" id="copy-signal-btn">
                     📋 Copier le signal
                 </button>
+                <button type="button" class="copy-signal-btn simulate-btn" id="simulate-btn">
+                    🎮 Simuler ce trade
+                </button>
             </div>
         `;
 
         attachCopyButton(data);
+        attachSimulateButton(data);
         resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
@@ -481,7 +436,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function renderZone(zone) {
         const typeClass = String(zone.type || "").includes("BUY") ? "zone-buy" : "zone-sell";
-
         return `
             <div class="zone-card ${typeClass}">
                 <div class="zone-header">
@@ -504,7 +458,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /* =========================================================
-       COPIER
+       COPIER LE SIGNAL
        ========================================================= */
 
     function attachCopyButton(data) {
@@ -548,6 +502,118 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /* =========================================================
+       SIMULER LE TRADE
+       ========================================================= */
+
+    function attachSimulateButton(data) {
+        const btn = document.getElementById("simulate-btn");
+        if (!btn) return;
+
+        // Vérifier si le simulateur est disponible
+        if (!window.ARKAS_SIMULATOR) {
+            btn.disabled = true;
+            btn.textContent = "🎮 Simulateur indisponible";
+            return;
+        }
+
+        btn.addEventListener("click", () => {
+
+            const result = window.ARKAS_SIMULATOR.addTrade(data);
+
+            if (result.success) {
+                btn.textContent = "✅ Trade ajouté !";
+                btn.disabled = true;
+
+                setTimeout(() => {
+                    btn.textContent = "🎮 Simuler ce trade";
+                    btn.disabled = false;
+                }, 2500);
+
+                renderSimulation();
+
+            } else {
+                alert(result.message);
+            }
+        });
+    }
+
+    /* =========================================================
+       RENDU SIMULATION
+       ========================================================= */
+
+    function renderSimulation() {
+
+        const container = document.getElementById("simulation-content");
+        const statsEl = {
+            total: document.getElementById("sim-total"),
+            win: document.getElementById("sim-win"),
+            loss: document.getElementById("sim-loss"),
+            pending: document.getElementById("sim-pending"),
+            rate: document.getElementById("sim-rate")
+        };
+
+        if (!container || !window.ARKAS_SIMULATOR) return;
+
+        const trades = window.ARKAS_SIMULATOR.getTrades();
+        const stats = window.ARKAS_SIMULATOR.getStats();
+
+        if (statsEl.total) statsEl.total.textContent = stats.total;
+        if (statsEl.win) statsEl.win.textContent = stats.wins;
+        if (statsEl.loss) statsEl.loss.textContent = stats.losses;
+        if (statsEl.pending) statsEl.pending.textContent = stats.pending;
+        if (statsEl.rate) statsEl.rate.textContent = stats.winRate ? `${stats.winRate}%` : "—";
+
+        if (!trades.length) {
+            container.innerHTML = `
+                <div class="empty-result">
+                    <div>🎮</div>
+                    <h3>Aucune simulation en cours</h3>
+                    <p>Copie un signal et clique "Simuler ce trade".</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="simulation-list">
+                ${trades.map(t => {
+                    const statusClass = t.status === "WIN" ? "sim-win" :
+                                       t.status === "LOSS" ? "sim-loss" : "sim-pending";
+                    const statusLabel = t.status === "WIN" ? "🎉 GAGNÉ" :
+                                       t.status === "LOSS" ? "😢 PERDU" : "⏳ EN COURS";
+
+                    return `
+                        <div class="simulation-item ${statusClass}">
+                            <div class="sim-line">
+                                <strong>${escapeHtml(t.asset)}</strong>
+                                <span class="sim-signal ${t.direction === "BUY" ? "signal-buy" : "signal-sell"}">
+                                    ${escapeHtml(t.direction)}
+                                </span>
+                                <span class="sim-status">${statusLabel}</span>
+                            </div>
+                            <div class="sim-line">
+                                <span>Entry : ${t.entry}</span>
+                                <span>SL : ${t.sl}</span>
+                                <span>TP1 : ${t.tp1}</span>
+                            </div>
+                            ${t.closePrice ? `
+                                <div class="sim-line">
+                                    <small>Prix de clôture : ${t.closePrice}</small>
+                                </div>
+                            ` : ""}
+                        </div>
+                    `;
+                }).join("")}
+            </div>
+        `;
+    }
+
+    // Écouter les résultats
+    window.addEventListener("arkas:trade-result", () => {
+        renderSimulation();
+    });
+
+    /* =========================================================
        HISTORIQUE
        ========================================================= */
 
@@ -576,7 +642,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function renderHistory() {
-
         const container = document.getElementById("history-content");
         const statsEl = {
             total: document.getElementById("stat-total"),
@@ -694,5 +759,6 @@ document.addEventListener("DOMContentLoaded", () => {
     renderPreviews();
     updateAnalyzeButton();
     renderHistory();
+    setTimeout(() => renderSimulation(), 500);
 
 });

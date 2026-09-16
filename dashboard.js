@@ -651,3 +651,151 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     /* =========================================================
+       HISTORIQUE
+       ========================================================= */
+
+    function saveToHistory(data) {
+        try {
+            const key = "arkas_signals_history";
+            const history = JSON.parse(localStorage.getItem(key) || "[]");
+            history.unshift({
+                id: Date.now(),
+                asset: data.asset || "—",
+                signal: data.signal || "WAIT",
+                direction: data.direction || "—",
+                entry: data.entry,
+                sl: data.sl,
+                tp1: data.tp1,
+                tp2: data.tp2,
+                tp3: data.tp3,
+                rr: data.rr,
+                confidence: data.confidence_percent,
+                score: data.arkas_score,
+                result: "PENDING",
+                date: new Date().toISOString()
+            });
+            localStorage.setItem(key, JSON.stringify(history.slice(0, 50)));
+        } catch (e) {}
+    }
+
+    function renderHistory() {
+        const container = document.getElementById("history-content");
+        const statsEl = {
+            total: document.getElementById("stat-total"),
+            win: document.getElementById("stat-win"),
+            loss: document.getElementById("stat-loss"),
+            rate: document.getElementById("stat-rate")
+        };
+
+        if (!container) return;
+
+        let history = [];
+        try { history = JSON.parse(localStorage.getItem("arkas_signals_history") || "[]"); } catch {}
+
+        if (!history.length) {
+            container.innerHTML = `
+                <div class="empty-result">
+                    <div>📭</div>
+                    <h3>Aucun signal enregistré</h3>
+                    <p>Les signaux copiés apparaîtront ici.</p>
+                </div>
+            `;
+            if (statsEl.total) statsEl.total.textContent = "0";
+            if (statsEl.win) statsEl.win.textContent = "0";
+            if (statsEl.loss) statsEl.loss.textContent = "0";
+            if (statsEl.rate) statsEl.rate.textContent = "—";
+            return;
+        }
+
+        const total = history.length;
+        const wins = history.filter(h => h.result === "WIN").length;
+        const losses = history.filter(h => h.result === "LOSS").length;
+        const rate = total ? Math.round((wins / total) * 100) : 0;
+
+        if (statsEl.total) statsEl.total.textContent = total;
+        if (statsEl.win) statsEl.win.textContent = wins;
+        if (statsEl.loss) statsEl.loss.textContent = losses;
+        if (statsEl.rate) statsEl.rate.textContent = `${rate}%`;
+
+        container.innerHTML = `
+            <div class="history-list">
+                ${history.map(h => `
+                    <div class="history-item">
+                        <div class="history-line">
+                            <strong>${escapeHtml(h.asset)}</strong>
+                            <span class="history-signal">${escapeHtml(h.signal)}</span>
+                        </div>
+                        <div class="history-line">
+                            <small>${new Date(h.date).toLocaleString("fr-FR")}</small>
+                        </div>
+                        <div class="history-line">
+                            <span>Entry : ${h.entry ?? "—"}</span>
+                            <span>SL : ${h.sl ?? "—"}</span>
+                            <span>TP1 : ${h.tp1 ?? "—"}</span>
+                        </div>
+                    </div>
+                `).join("")}
+            </div>
+        `;
+    }
+
+    /* =========================================================
+       HELPERS
+       ========================================================= */
+
+    function setButtonsDisabled(d) {
+        if (analyzeBtn) analyzeBtn.disabled = d;
+        if (resetBtn) resetBtn.disabled = d;
+        if (importBtn) importBtn.disabled = d;
+    }
+
+    function showStatus(msg, type = "info") {
+        if (!analysisStatus) return;
+        analysisStatus.textContent = msg;
+        analysisStatus.className = "analysis-status status-" + type;
+    }
+
+    function resultCard(title, value) {
+        return `<div class="result-card"><span class="result-card-title">${escapeHtml(title)}</span><strong class="result-card-value">${escapeHtml(String(value))}</strong></div>`;
+    }
+
+    function detailBlock(title, value) {
+        return `<div class="detail-block"><h3>${escapeHtml(title)}</h3><p>${escapeHtml(String(value))}</p></div>`;
+    }
+
+    function safe(v, f = "—") {
+        if (v === null || v === undefined || v === "") return f;
+        return v;
+    }
+
+    function formatNumber(v) {
+        if (v === null || v === undefined || v === "") return "—";
+        return String(v);
+    }
+
+    function getSignalClass(signal) {
+        const s = String(signal).toUpperCase();
+        if (s.includes("BUY")) return "signal-buy";
+        if (s.includes("SELL")) return "signal-sell";
+        return "signal-wait";
+    }
+
+    function escapeHtml(v) {
+        return String(v)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    /* =========================================================
+       INITIALISATION
+       ========================================================= */
+
+    renderPreviews();
+    updateAnalyzeButton();
+    renderHistory();
+    setTimeout(() => renderSimulation(), 500);
+
+});

@@ -263,72 +263,57 @@ function classifyMarket(asset) {
 function buildMultiTFPrompt(images) {
 
     const count = images.length;
-    const tfList = images.map(img => img.timeframe).join(" + ");
 
     return `
 Tu es ARKAS SCAN AI, expert en analyse multi-timeframe (SMC + ICT + Price Action).
 
 ============================================================
-ANALYSE MULTI-TIMEFRAME
+ANALYSE MULTI-TIMEFRAME AVEC DÉTECTION AUTO
 ============================================================
 
-Tu reçois ${count} capture(s) :
-
-${images.map((img, i) => `- Image ${i + 1} : ${img.timeframe}`).join("\n")}
-
-Timeframes fournis : ${tfList}
+Tu reçois ${count} capture(s) SANS indication de timeframe.
 
 ============================================================
-ÉTAPE 1 — ANALYSE CHAQUE TIMEFRAME
+ÉTAPE 1 — DÉTECTION DU TIMEFRAME
+============================================================
+
+Pour CHAQUE image, tu dois DÉTECTER le timeframe en analysant :
+- Les bougies (nombre, taille)
+- L'échelle de temps (M1, M5, M15, M30, H1, H4, D1, W1)
+- Les indicateurs visibles (si affichés)
+- Le contexte général
+
+Timeframes possibles : M1, M5, M15, M30, H1, H4, D1, W1
+
+Si tu ne peux PAS déterminer le timeframe → retourne "UNKNOWN".
+N'INVENTE JAMAIS un timeframe.
+
+============================================================
+ÉTAPE 2 — ANALYSE PAR TIMEFRAME
 ============================================================
 
 Pour chaque image, identifie :
+- Le timeframe détecté
 - Le biais directionnel (BUY / SELL / NEUTRAL)
 - La structure (BOS, CHoCH, OB, FVG, liquidité)
-- Les zones clés (support / résistance / OB)
+- Les zones clés
 
 ============================================================
-ÉTAPE 2 — VÉRIFIE LA CONFLUENCE
+ÉTAPE 3 — CONFLUENCE
 ============================================================
 
 - ALIGNED      → tous les TF vont dans le même sens
 - PARTIAL      → 2 sur 3 alignés
-- DISAGREEMENT → désaccord entre TF
-- NEUTRAL      → aucun biais clair
+- DISAGREEMENT → désaccord
+- NEUTRAL      → aucun biais
 
 ============================================================
-ÉTAPE 3 — SIGNAL FINAL
+ÉTAPE 4 — SIGNAL FINAL
 ============================================================
 
-- BUY NOW / SELL NOW      → confluence totale + entrée immédiate
-- BUY LIMIT / SELL LIMIT  → attente retour sur zone
-- WAIT                    → désaccord ou illisible
-
-============================================================
-RÈGLE DE FIABILITÉ
-============================================================
-
-- 3 TF alignés → confiance +30%
-- 2 TF alignés → confiance normale
-- Désaccord    → confiance -40%
-
-============================================================
-SCÉNARIOS MULTIPLES (OBLIGATOIRE)
-============================================================
-
-Fournis 2 à 4 scénarios BUY LIMIT / SELL LIMIT.
-
-Chaque scénario :
-- id, type, zone_label, zone_price
-- entry, sl, tp1, tp2, tp3, rr
-- trigger, probability, invalidation, priority
-
-============================================================
-NIVEAUX
-============================================================
-
-BUY  : SL < Entry < TP1 < TP2 < TP3
-SELL : TP3 < TP2 < TP1 < Entry < SL
+- BUY NOW / SELL NOW      → confluence totale
+- BUY LIMIT / SELL LIMIT  → attente retour zone
+- WAIT                    → désaccord
 
 ============================================================
 FORMAT JSON (aucun Markdown)
@@ -338,10 +323,11 @@ FORMAT JSON (aucun Markdown)
   "asset": "",
   "market_type": "",
   "strategy_applied": "MULTI_TF",
-  "timeframes_analyzed": [],
+  "timeframes_analyzed": ["H4", "H1", "M15"],
   "tf_analysis": [
     {
-      "timeframe": "",
+      "image_index": 1,
+      "timeframe": "H4",
       "bias": "BUY|SELL|NEUTRAL",
       "structure": "",
       "key_zone": ""
@@ -368,7 +354,7 @@ FORMAT JSON (aucun Markdown)
     "risk_percent": "1%",
     "recommendation": ""
   },
-  "economic_news": "Non disponible — vérifier le calendrier.",
+  "economic_news": "",
   "risk_warning": ""
 }
 
@@ -376,10 +362,10 @@ FORMAT JSON (aucun Markdown)
 INSTRUCTIONS FINALES
 ============================================================
 
+- IMPORTANT : détecte le timeframe de CHAQUE image.
+- Le champ "tf_analysis" DOIT avoir un élément par image, dans l'ordre.
 - Réponds UNIQUEMENT en JSON valide.
-- Aucun texte avant ou après.
 - Ne force JAMAIS un trade.
-- Sois honnête sur la confluence.
 `;
 }
 

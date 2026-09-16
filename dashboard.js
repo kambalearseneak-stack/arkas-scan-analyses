@@ -1,6 +1,6 @@
 /* =========================================================
    ARKAS SCAN AI V2 — DASHBOARD
-   Multi-timeframe + Audit + Simulation
+   Multi-timeframe + Audit + Simulation par scénario
    ========================================================= */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -46,16 +46,11 @@ document.addEventListener("DOMContentLoaded", () => {
             if (e.target.closest("button")) return;
             if (!isProcessing) fileInput.click();
         });
-
         dropZone.addEventListener("dragover", (e) => {
             e.preventDefault();
             dropZone.classList.add("drag-over");
         });
-
-        dropZone.addEventListener("dragleave", () => {
-            dropZone.classList.remove("drag-over");
-        });
-
+        dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
         dropZone.addEventListener("drop", (e) => {
             e.preventDefault();
             dropZone.classList.remove("drag-over");
@@ -72,6 +67,10 @@ document.addEventListener("DOMContentLoaded", () => {
             handleFiles(files);
         });
     }
+
+    /* =========================================================
+       COMPRESSION
+       ========================================================= */
 
     function compressImage(file, maxWidth = 1600, quality = 0.85) {
         return new Promise((resolve, reject) => {
@@ -110,7 +109,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const slotN = i + 1;
             if (!allowed.includes(file.type)) continue;
             if (file.size > MAX_SIZE) continue;
-
             try {
                 const compressed = await compressImage(file);
                 const base64 = await blobToDataURL(compressed);
@@ -197,15 +195,11 @@ document.addEventListener("DOMContentLoaded", () => {
     function updateAnalyzeButton() {
         const filled = Object.values(slots).filter(s => s.base64).length;
         const can = filled >= 1 && !isProcessing;
-
         if (analyzeBtn) analyzeBtn.disabled = !can;
         if (auditBtn) auditBtn.disabled = !can;
 
-        if (filled === 0) {
-            showStatus("Importe au moins 1 capture.", "info");
-        } else {
-            showStatus(`✅ ${filled} image(s) prête(s).`, "success");
-        }
+        if (filled === 0) showStatus("Importe au moins 1 capture.", "info");
+        else showStatus(`✅ ${filled} image(s) prête(s).`, "success");
     }
 
     if (analyzeBtn) {
@@ -238,17 +232,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function analyzeMultiTF(isAudit = false) {
-
         const images = [];
         for (let i = 1; i <= MAX_IMAGES; i++) {
             if (!slots[i].base64) continue;
             const clean = slots[i].base64.includes(",")
                 ? slots[i].base64.split(",")[1]
                 : slots[i].base64;
-            images.push({
-                imageBase64: clean,
-                mimeType: slots[i].mimeType || "image/jpeg"
-            });
+            images.push({ imageBase64: clean, mimeType: slots[i].mimeType || "image/jpeg" });
         }
 
         if (!images.length) {
@@ -260,8 +250,7 @@ document.addEventListener("DOMContentLoaded", () => {
         setButtonsDisabled(true);
         resultsSection.classList.add("hidden");
         globalLoader.classList.remove("hidden");
-        showStatus(isAudit ? "🧪 Audit en cours…" : "🔍 Analyse en cours…", "loading");
-
+        showStatus(isAudit ? "🧪 Audit…" : "🔍 Analyse…", "loading");
         startScanEffect();
 
         try {
@@ -287,7 +276,6 @@ document.addEventListener("DOMContentLoaded", () => {
             catch { throw new Error("Réponse invalide."); }
 
             if (!response.ok) throw new Error(data?.error || `Erreur ${response.status}`);
-            if (!data) throw new Error("Aucune réponse.");
 
             if (!isAudit) displayDetectedTimeframes(data);
             renderResults(data, isAudit);
@@ -316,11 +304,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 detectedEl.classList.remove("hidden");
                 detectedEl.className = `tf-detected tf-bias-${(tf.bias || "neutral").toLowerCase()}`;
             } else {
-                detectedEl.textContent = "📊 Timeframe non détecté";
+                detectedEl.textContent = "📊 Non détecté";
                 detectedEl.classList.remove("hidden");
             }
         }
     }
+
+    /* =========================================================
+       RENDU RÉSULTATS
+       ========================================================= */
 
     function renderResults(data, isAudit = false) {
         resultsSection.classList.remove("hidden");
@@ -339,6 +331,69 @@ document.addEventListener("DOMContentLoaded", () => {
             ? renderConfluence(data.confluence_status)
             : "";
 
+        /* ===================================================
+           DÉCISION : 1 SEUL SIGNAL OU 3 SIGNAUX ?
+           =================================================== */
+
+        const confluence = data.confluence_status || "NEUTRAL";
+        const zones = Array.isArray(data.zones) ? data.zones : [];
+
+        // Détermine si c'est aligné (1 seul signal) ou désaccord (3 signaux)
+        const isAligned = confluence === "ALIGNED";
+        const isPartial = confluence === "PARTIAL";
+
+        // Sélectionne les scénarios à afficher
+        let scenariosToShow = [];
+
+        if (isAligned && zones.length > 0) {
+            // ALIGNED → 1 seul signal principal
+            scenariosToShow = [zones[0]];
+        } else if (isPartial && zones.length > 0) {
+            // PARTIAL → signal principal + 1 alternatif max
+            scenariosToShow = zones.slice(0, 2);
+        } else if (zones.length > 0) {
+            // DISAGREEMENT → tous les scénarios
+            scenariosToShow = zones;
+        }
+
+        // Le signal principal
+        const mainSignalHtml = `
+            <div class="result-main ${signalClass}">
+                <div class="result-signal">${escapeHtml(signal)}</div>
+                <div class="result-meta">Actif : <strong>${escapeHtml(data.asset || "—")}</strong></div>
+                <div class="strategy-badge">
+                    ${escapeHtml(data.strategy_applied || "MULTI_TF")}
+                    <span class="market-type">${escapeHtml(data.market_type || "—")}</span>
+                </div>
+            </div>
+
+            <div class="main-signal-actions">
+                <button type="button" class="copy-signal-btn" data-action="copy" data-signal-type="main">
+                    📋 Copier
+                </button>
+                <button type="button" class="copy-signal-btn simulate-btn" data-action="simulate" data-signal-type="main">
+                    🎮 Simuler
+                </button>
+            </div>
+        `;
+
+        // Scénarios multiples
+        const scenariosHtml = scenariosToShow.length
+            ? `
+                <div class="zones-section">
+                    <h3 class="zones-title">
+                        ${isAligned ? "🎯 Signal fiable (confluence totale)" : 
+                          isPartial ? "🎯 Signaux alternatifs" : 
+                          "🎯 Signaux par timeframe"}
+                    </h3>
+                    <div class="zones-grid">
+                        ${scenariosToShow.map((z, idx) => renderZone(z, idx)).join("")}
+                    </div>
+                </div>
+            `
+            : "";
+
+        // TF analysis
         const tfHtml = Array.isArray(data.tf_analysis) && data.tf_analysis.length
             ? `
                 <div class="tf-analysis-section">
@@ -361,27 +416,8 @@ document.addEventListener("DOMContentLoaded", () => {
             `
             : "";
 
-        const zonesHtml = Array.isArray(data.zones) && data.zones.length
-            ? `
-                <div class="zones-section">
-                    <h3 class="zones-title">🎯 Scénarios multiples</h3>
-                    <div class="zones-grid">
-                        ${data.zones.map(z => renderZone(z)).join("")}
-                    </div>
-                </div>
-            `
-            : "";
-
         resultsContent.innerHTML = `
-            <div class="result-main ${signalClass}">
-                <div class="result-signal">${escapeHtml(signal)}</div>
-                <div class="result-meta">Actif : <strong>${escapeHtml(data.asset || "—")}</strong></div>
-                <div class="strategy-badge">
-                    ${escapeHtml(data.strategy_applied || "MULTI_TF")}
-                    <span class="market-type">${escapeHtml(data.market_type || "—")}</span>
-                </div>
-            </div>
-
+            ${mainSignalHtml}
             ${confluenceHtml}
             ${tfHtml}
 
@@ -403,25 +439,196 @@ document.addEventListener("DOMContentLoaded", () => {
                 ${detailBlock("⚠️ Invalidation", safe(data.invalidation, "—"))}
             </div>
 
-            ${zonesHtml}
-
-            <div class="copy-signal-area">
-                <button type="button" class="copy-signal-btn" id="copy-signal-btn">📋 Copier le signal</button>
-                <button type="button" class="copy-signal-btn simulate-btn" id="simulate-btn">🎮 Simuler ce trade</button>
-            </div>
+            ${scenariosHtml}
         `;
 
-        attachCopyButton(data, false);
-        attachSimulateButton(data);
+        // Attacher les boutons
+        attachSignalButtons(data, scenariosToShow);
+
         resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
     }
+
+    /* =========================================================
+       RENDU D'UNE ZONE AVEC SES BOUTONS
+       ========================================================= */
+
+    function renderZone(zone, index) {
+        const typeClass = String(zone.type || "").includes("BUY") ? "zone-buy" : "zone-sell";
+        const zoneId = `zone-${index}`;
+
+        return `
+            <div class="zone-card ${typeClass}" data-zone-id="${zoneId}">
+                <div class="zone-header">
+                    <span class="zone-id">${escapeHtml(zone.id || "A")}</span>
+                    <span class="zone-type">${escapeHtml(String(zone.type || "").replace("_", " "))}</span>
+                    <span class="zone-priority">P${zone.priority || (index + 1)}</span>
+                </div>
+
+                <div class="zone-label">${escapeHtml(zone.zone_label || "")}</div>
+
+                ${zone.zone_price ? `<div class="zone-price">📍 ${escapeHtml(zone.zone_price)}</div>` : ""}
+
+                <div class="zone-levels">
+                    <div><span>Entry</span><strong>${escapeHtml(String(zone.entry ?? "—"))}</strong></div>
+                    <div><span>SL</span><strong>${escapeHtml(String(zone.sl ?? "—"))}</strong></div>
+                    <div><span>TP1</span><strong>${escapeHtml(String(zone.tp1 ?? "—"))}</strong></div>
+                    <div><span>TP2</span><strong>${escapeHtml(String(zone.tp2 ?? "—"))}</strong></div>
+                    <div><span>TP3</span><strong>${escapeHtml(String(zone.tp3 ?? "—"))}</strong></div>
+                    <div><span>RR</span><strong>${escapeHtml(String(zone.rr ?? "—"))}</strong></div>
+                </div>
+
+                <div class="zone-actions">
+                    <button type="button"
+                            class="copy-signal-btn zone-btn"
+                            data-action="copy"
+                            data-signal-type="zone"
+                            data-zone-index="${index}">
+                        📋 Copier
+                    </button>
+                    <button type="button"
+                            class="copy-signal-btn simulate-btn zone-btn"
+                            data-action="simulate"
+                            data-signal-type="zone"
+                            data-zone-index="${index}">
+                        🎮 Simuler
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    /* =========================================================
+       ATTACHER LES BOUTONS
+       ========================================================= */
+
+    function attachSignalButtons(mainData, zones) {
+
+        // Boutons du signal principal
+        document.querySelectorAll('[data-signal-type="main"]').forEach(btn => {
+            btn.addEventListener("click", () => {
+                if (btn.dataset.action === "copy") {
+                    copySignal(mainData, btn);
+                } else if (btn.dataset.action === "simulate") {
+                    simulateSignal(mainData, btn);
+                }
+            });
+        });
+
+        // Boutons des scénarios
+        document.querySelectorAll('[data-signal-type="zone"]').forEach(btn => {
+            btn.addEventListener("click", () => {
+                const idx = parseInt(btn.dataset.zoneIndex, 10);
+                const zone = zones[idx];
+                if (!zone) return;
+
+                // Fusionner les infos de la zone avec les infos de base
+                const zoneData = {
+                    asset: mainData.asset,
+                    market_type: mainData.market_type,
+                    signal: zone.type ? zone.type.replace("_", " ") : "WAIT",
+                    direction: zone.type && zone.type.includes("BUY") ? "BUY" : "SELL",
+                    entry: zone.entry,
+                    sl: zone.sl,
+                    tp1: zone.tp1,
+                    tp2: zone.tp2,
+                    tp3: zone.tp3,
+                    rr: zone.rr,
+                    zone_label: zone.zone_label
+                };
+
+                if (btn.dataset.action === "copy") {
+                    copySignal(zoneData, btn);
+                } else if (btn.dataset.action === "simulate") {
+                    simulateSignal(zoneData, btn);
+                }
+            });
+        });
+    }
+
+    /* =========================================================
+       COPIER UN SIGNAL
+       ========================================================= */
+
+    async function copySignal(data, btn) {
+        const text = buildSignalText(data);
+        try {
+            await navigator.clipboard.writeText(text);
+            const original = btn.textContent;
+            btn.textContent = "✅ Copié !";
+            saveToHistory(data);
+            renderHistory();
+            setTimeout(() => { btn.textContent = original; }, 2000);
+        } catch (err) {
+            btn.textContent = "❌ Échec";
+            setTimeout(() => { btn.textContent = "📋 Copier"; }, 2000);
+        }
+    }
+
+    /* =========================================================
+       SIMULER UN SIGNAL
+       ========================================================= */
+
+    function simulateSignal(data, btn) {
+
+        if (!window.ARKAS_SIMULATOR) {
+            alert("⚠️ Simulateur indisponible.");
+            return;
+        }
+
+        if (!data.entry || !data.sl || !data.tp1) {
+            alert("❌ Ce signal n'a pas de niveaux chiffrés.\nImpossible de simuler.");
+            return;
+        }
+
+        const result = window.ARKAS_SIMULATOR.addTrade(data);
+
+        if (result.success) {
+            const original = btn.textContent;
+            btn.textContent = "✅ Ajouté !";
+            btn.disabled = true;
+            renderSimulation();
+
+            setTimeout(() => {
+                btn.textContent = original;
+                btn.disabled = false;
+            }, 2500);
+        } else {
+            alert(result.message);
+        }
+    }
+
+    function buildSignalText(data) {
+        return [
+            "🎯 ARKAS SIGNAL",
+            "",
+            `Actif : ${data.asset || "—"}`,
+            `Signal : ${data.signal || "WAIT"}`,
+            `Direction : ${data.direction || "—"}`,
+            data.zone_label ? `Zone : ${data.zone_label}` : "",
+            "",
+            `Entry : ${data.entry ?? "—"}`,
+            `SL : ${data.sl ?? "—"}`,
+            `TP1 : ${data.tp1 ?? "—"}`,
+            `TP2 : ${data.tp2 ?? "—"}`,
+            `TP3 : ${data.tp3 ?? "—"}`,
+            `RR : ${data.rr ?? "—"}`,
+            "",
+            `Confiance : ${data.confidence_percent ?? "—"}%`,
+            `Score : ${data.arkas_score ?? "—"}`,
+            "",
+            "Généré par ARKAS SCAN AI"
+        ].filter(Boolean).join("\n");
+    }
+
+    /* =========================================================
+       AUDIT
+       ========================================================= */
 
     function renderAuditResults(data) {
         const audit = data.audit || {};
         const status = audit.status || "UNCLEAR";
         const verdict = audit.verdict || "Audit non disponible.";
         const corrected = audit.corrected_trade || {};
-
         const statusInfo = getAuditStatus(status);
 
         return `
@@ -434,20 +641,11 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
 
             <div class="audit-columns">
-                <div class="audit-box">
-                    <h3>✅ Points positifs</h3>
-                    ${renderList(audit.strengths)}
-                </div>
-                <div class="audit-box">
-                    <h3>⚠️ Points à corriger</h3>
-                    ${renderList(audit.errors)}
-                </div>
+                <div class="audit-box"><h3>✅ Points positifs</h3>${renderList(audit.strengths)}</div>
+                <div class="audit-box"><h3>⚠️ À corriger</h3>${renderList(audit.errors)}</div>
             </div>
 
-            <div class="audit-box correction-box">
-                <h3>🛠️ Corrections proposées</h3>
-                ${renderList(audit.corrections)}
-            </div>
+            <div class="audit-box"><h3>🛠️ Corrections</h3>${renderList(audit.corrections)}</div>
 
             <div class="corrected-trade">
                 <h3>🎯 Analyse corrigée</h3>
@@ -456,8 +654,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     ${resultCard("Entry", formatNumber(corrected.entry))}
                     ${resultCard("SL", formatNumber(corrected.sl))}
                     ${resultCard("TP1", formatNumber(corrected.tp1))}
-                    ${resultCard("TP2", formatNumber(corrected.tp2))}
-                    ${resultCard("TP3", formatNumber(corrected.tp3))}
                     ${resultCard("RR", safe(corrected.rr, "—"))}
                 </div>
                 <div class="validation-probability">
@@ -465,135 +661,32 @@ document.addEventListener("DOMContentLoaded", () => {
                     <strong>${escapeHtml(String(corrected.validation_probability ?? "—"))}%</strong>
                 </div>
                 <div class="copy-signal-area">
-                    <button type="button" class="copy-signal-btn" id="copy-signal-btn">
-                        📋 Copier le signal corrigé
+                    <button type="button" class="copy-signal-btn" id="copy-audit-btn">
+                        📋 Copier
+                    </button>
+                    <button type="button" class="copy-signal-btn simulate-btn" id="simulate-audit-btn">
+                        🎮 Simuler
                     </button>
                 </div>
             </div>
         `;
     }
 
-    function renderList(items) {
-        if (!Array.isArray(items) || !items.length) {
-            return `<p class="empty-list">Aucun élément.</p>`;
-        }
-        return `<ul>${items.map(i => `<li>${escapeHtml(String(i))}</li>`).join("")}</ul>`;
-    }
-
-    function getAuditStatus(status) {
-        switch (String(status).toUpperCase()) {
-            case "VALIDATED": return { icon: "✅", title: "ANALYSE VALIDÉE", className: "audit-valid" };
-            case "CORRECT": return { icon: "⚠️", title: "ANALYSE À CORRIGER", className: "audit-correct" };
-            case "PREMATURE": return { icon: "🟡", title: "ENTRÉE PRÉMATURÉE", className: "audit-premature" };
-            case "INVALID": return { icon: "❌", title: "ANALYSE INVALIDÉE", className: "audit-invalid" };
-            default: return { icon: "❓", title: "ANALYSE NON DÉTERMINÉE", className: "audit-unclear" };
-        }
-    }
-
-    function renderConfluence(status) {
-        const map = {
-            ALIGNED:      { cls: "confluence-aligned",      label: "✅ Timeframes alignés" },
-            PARTIAL:      { cls: "confluence-partial",      label: "⚠️ Alignement partiel" },
-            DISAGREEMENT: { cls: "confluence-disagreement", label: "❌ Désaccord entre timeframes" },
-            NEUTRAL:      { cls: "confluence-neutral",      label: "➖ Neutre" }
-        };
-        const info = map[status] || map.NEUTRAL;
-        return `<div class="confluence-banner ${info.cls}"><strong>Confluence :</strong> ${escapeHtml(info.label)}</div>`;
-    }
-
-    function renderZone(zone) {
-        const typeClass = String(zone.type || "").includes("BUY") ? "zone-buy" : "zone-sell";
-        return `
-            <div class="zone-card ${typeClass}">
-                <div class="zone-header">
-                    <span class="zone-id">${escapeHtml(zone.id || "A")}</span>
-                    <span class="zone-type">${escapeHtml(String(zone.type || "").replace("_", " "))}</span>
-                    <span class="zone-priority">P${zone.priority || 1}</span>
-                </div>
-                <div class="zone-label">${escapeHtml(zone.zone_label || "")}</div>
-                ${zone.zone_price ? `<div class="zone-price">📍 ${escapeHtml(zone.zone_price)}</div>` : ""}
-                <div class="zone-levels">
-                    <div><span>Entry</span><strong>${escapeHtml(String(zone.entry ?? "—"))}</strong></div>
-                    <div><span>SL</span><strong>${escapeHtml(String(zone.sl ?? "—"))}</strong></div>
-                    <div><span>TP1</span><strong>${escapeHtml(String(zone.tp1 ?? "—"))}</strong></div>
-                    <div><span>TP2</span><strong>${escapeHtml(String(zone.tp2 ?? "—"))}</strong></div>
-                    <div><span>TP3</span><strong>${escapeHtml(String(zone.tp3 ?? "—"))}</strong></div>
-                    <div><span>RR</span><strong>${escapeHtml(String(zone.rr ?? "—"))}</strong></div>
-                </div>
-            </div>
-        `;
-    }
-
     function attachCopyButton(data, isAudit) {
-        const btn = document.getElementById("copy-signal-btn");
-        if (!btn) return;
-        btn.addEventListener("click", async () => {
-            const text = isAudit ? buildAuditText(data) : buildSignalText(data);
-            try {
-                await navigator.clipboard.writeText(text);
-                btn.textContent = "✅ Signal copié !";
-                if (!isAudit) { saveToHistory(data); renderHistory(); }
-                setTimeout(() => { btn.textContent = "📋 Copier le signal"; }, 2000);
-            } catch (err) { btn.textContent = "❌ Copie impossible"; }
-        });
-    }
+        const copyBtn = document.getElementById(isAudit ? "copy-audit-btn" : "copy-signal-btn");
+        const simBtn = document.getElementById(isAudit ? "simulate-audit-btn" : "simulate-btn");
 
-    function buildSignalText(data) {
-        return [
-            "🎯 ARKAS SIGNAL", "",
-            `Actif : ${data.asset || "—"}`,
-            `Signal : ${data.signal || "WAIT"}`,
-            `Direction : ${data.direction || "—"}`, "",
-            `Entry : ${data.entry ?? "—"}`,
-            `SL : ${data.sl ?? "—"}`,
-            `TP1 : ${data.tp1 ?? "—"}`,
-            `TP2 : ${data.tp2 ?? "—"}`,
-            `TP3 : ${data.tp3 ?? "—"}`,
-            `RR : ${data.rr ?? "—"}`, "",
-            `Confiance : ${data.confidence_percent ?? "—"}%`,
-            `Score : ${data.arkas_score ?? "—"}`, "",
-            "Généré par ARKAS SCAN AI"
-        ].join("\n");
-    }
-
-    function buildAuditText(data) {
-        const audit = data.audit || {};
-        const c = audit.corrected_trade || {};
-        return [
-            "🧪 ARKAS AUDIT", "",
-            `Statut : ${audit.status || "—"}`,
-            `Verdict : ${audit.verdict || "—"}`, "",
-            "Analyse corrigée :",
-            `Signal : ${c.signal ?? "—"}`,
-            `Entry : ${c.entry ?? "—"}`,
-            `SL : ${c.sl ?? "—"}`,
-            `TP1 : ${c.tp1 ?? "—"}`,
-            `RR : ${c.rr ?? "—"}`, "",
-            `Probabilité : ${c.validation_probability ?? "—"}%`, "",
-            "Généré par ARKAS SCAN AI"
-        ].join("\n");
-    }
-
-    function attachSimulateButton(data) {
-        const btn = document.getElementById("simulate-btn");
-        if (!btn) return;
-        if (!window.ARKAS_SIMULATOR) {
-            btn.disabled = true;
-            btn.textContent = "🎮 Simulateur indisponible";
-            return;
+        if (copyBtn) {
+            copyBtn.addEventListener("click", () => copySignal(data, copyBtn));
         }
-        btn.addEventListener("click", () => {
-            const result = window.ARKAS_SIMULATOR.addTrade(data);
-            if (result.success) {
-                btn.textContent = "✅ Trade ajouté !";
-                btn.disabled = true;
-                setTimeout(() => { btn.textContent = "🎮 Simuler ce trade"; btn.disabled = false; }, 2500);
-                renderSimulation();
-            } else {
-                alert(result.message);
-            }
-        });
+        if (simBtn) {
+            simBtn.addEventListener("click", () => simulateSignal(data, simBtn));
+        }
     }
+
+    /* =========================================================
+       SIMULATION
+       ========================================================= */
 
     function renderSimulation() {
         const container = document.getElementById("simulation-content");
@@ -616,7 +709,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (statsEl.rate) statsEl.rate.textContent = stats.winRate ? `${stats.winRate}%` : "—";
 
         if (!trades.length) {
-            container.innerHTML = `<div class="empty-result"><div>🎮</div><h3>Aucune simulation</h3><p>Copie un signal et clique "Simuler".</p></div>`;
+            container.innerHTML = `<div class="empty-result"><div>🎮</div><h3>Aucune simulation</h3><p>Clique "Simuler" sur un signal.</p></div>`;
             return;
         }
 
@@ -646,6 +739,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     window.addEventListener("arkas:trade-result", () => renderSimulation());
 
+    /* =========================================================
+       HISTORIQUE
+       ========================================================= */
+
     function saveToHistory(data) {
         try {
             const key = "arkas_signals_history";
@@ -655,12 +752,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 asset: data.asset || "—",
                 signal: data.signal || "WAIT",
                 direction: data.direction || "—",
-                entry: data.entry, sl: data.sl,
-                tp1: data.tp1, tp2: data.tp2, tp3: data.tp3,
-                rr: data.rr,
-                confidence: data.confidence_percent,
-                score: data.arkas_score,
-                result: "PENDING",
+                entry: data.entry,
+                sl: data.sl,
+                tp1: data.tp1,
                 date: new Date().toISOString()
             });
             localStorage.setItem(key, JSON.stringify(history.slice(0, 50)));
@@ -674,31 +768,10 @@ document.addEventListener("DOMContentLoaded", () => {
         let history = [];
         try { history = JSON.parse(localStorage.getItem("arkas_signals_history") || "[]"); } catch {}
 
-        const statsEl = {
-            total: document.getElementById("stat-total"),
-            win: document.getElementById("stat-win"),
-            loss: document.getElementById("stat-loss"),
-            rate: document.getElementById("stat-rate")
-        };
-
         if (!history.length) {
             container.innerHTML = `<div class="empty-result"><div>📭</div><h3>Aucun signal</h3><p>Les signaux copiés apparaîtront ici.</p></div>`;
-            if (statsEl.total) statsEl.total.textContent = "0";
-            if (statsEl.win) statsEl.win.textContent = "0";
-            if (statsEl.loss) statsEl.loss.textContent = "0";
-            if (statsEl.rate) statsEl.rate.textContent = "—";
             return;
         }
-
-        const total = history.length;
-        const wins = history.filter(h => h.result === "WIN").length;
-        const losses = history.filter(h => h.result === "LOSS").length;
-        const rate = total ? Math.round((wins / total) * 100) : 0;
-
-        if (statsEl.total) statsEl.total.textContent = total;
-        if (statsEl.win) statsEl.win.textContent = wins;
-        if (statsEl.loss) statsEl.loss.textContent = losses;
-        if (statsEl.rate) statsEl.rate.textContent = `${rate}%`;
 
         container.innerHTML = `
             <div class="history-list">
@@ -709,15 +782,40 @@ document.addEventListener("DOMContentLoaded", () => {
                             <span class="history-signal">${escapeHtml(h.signal)}</span>
                         </div>
                         <div class="history-line"><small>${new Date(h.date).toLocaleString("fr-FR")}</small></div>
-                        <div class="history-line">
-                            <span>Entry : ${h.entry ?? "—"}</span>
-                            <span>SL : ${h.sl ?? "—"}</span>
-                            <span>TP1 : ${h.tp1 ?? "—"}</span>
-                        </div>
                     </div>
                 `).join("")}
             </div>
         `;
+    }
+
+    /* =========================================================
+       HELPERS
+       ========================================================= */
+
+    function renderConfluence(status) {
+        const map = {
+            ALIGNED:      { cls: "confluence-aligned",      label: "✅ Confluence totale — 1 signal fiable" },
+            PARTIAL:      { cls: "confluence-partial",      label: "⚠️ Alignement partiel — signaux alternatifs" },
+            DISAGREEMENT: { cls: "confluence-disagreement", label: "❌ Désaccord — 3 signaux proposés" },
+            NEUTRAL:      { cls: "confluence-neutral",      label: "➖ Neutre" }
+        };
+        const info = map[status] || map.NEUTRAL;
+        return `<div class="confluence-banner ${info.cls}"><strong>Confluence :</strong> ${escapeHtml(info.label)}</div>`;
+    }
+
+    function getAuditStatus(status) {
+        switch (String(status).toUpperCase()) {
+            case "VALIDATED": return { icon: "✅", title: "ANALYSE VALIDÉE", className: "audit-valid" };
+            case "CORRECT": return { icon: "⚠️", title: "ANALYSE À CORRIGER", className: "audit-correct" };
+            case "PREMATURE": return { icon: "🟡", title: "ENTRÉE PRÉMATURÉE", className: "audit-premature" };
+            case "INVALID": return { icon: "❌", title: "ANALYSE INVALIDÉE", className: "audit-invalid" };
+            default: return { icon: "❓", title: "NON DÉTERMINÉE", className: "audit-unclear" };
+        }
+    }
+
+    function renderList(items) {
+        if (!Array.isArray(items) || !items.length) return `<p class="empty-list">Aucun élément.</p>`;
+        return `<ul>${items.map(i => `<li>${escapeHtml(String(i))}</li>`).join("")}</ul>`;
     }
 
     function setButtonsDisabled(d) {
@@ -741,15 +839,9 @@ document.addEventListener("DOMContentLoaded", () => {
         return `<div class="detail-block"><h3>${escapeHtml(title)}</h3><p>${escapeHtml(String(value))}</p></div>`;
     }
 
-    function safe(v, f = "—") {
-        if (v === null || v === undefined || v === "") return f;
-        return v;
-    }
+    function safe(v, f = "—") { return (v === null || v === undefined || v === "") ? f : v; }
 
-    function formatNumber(v) {
-        if (v === null || v === undefined || v === "") return "—";
-        return String(v);
-    }
+    function formatNumber(v) { return (v === null || v === undefined || v === "") ? "—" : String(v); }
 
     function getSignalClass(signal) {
         const s = String(signal).toUpperCase();
@@ -759,12 +851,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function escapeHtml(v) {
-        return String(v)
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
+        return String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
     }
 
     renderPreviews();

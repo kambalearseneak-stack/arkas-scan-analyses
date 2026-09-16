@@ -1,106 +1,50 @@
 // ============================================================
 // ARKAS SCAN AI V2
 // api/analyze.js
-// Gemini 3.6 Flash Vision — Multi-timeframe + Stratégie adaptative
+// Multi-timeframe + Audit + Stratégie adaptative
 // ============================================================
 
 export default async function handler(req, res) {
-
-    /* ========================================================
-       CORS
-       ======================================================== */
 
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-    if (req.method === "OPTIONS") {
-        return res.status(200).end();
-    }
-
+    if (req.method === "OPTIONS") return res.status(200).end();
     if (req.method !== "POST") {
-        return res.status(405).json({
-            error: "Méthode non autorisée. Utilisez POST."
-        });
+        return res.status(405).json({ error: "Méthode non autorisée. Utilisez POST." });
     }
 
     try {
-
-        /* ====================================================
-           API KEY
-           ==================================================== */
-
         const apiKey = process.env.GEMINI_API_KEY;
-
         if (!apiKey) {
-            return res.status(500).json({
-                error: "GEMINI_API_KEY est absente des variables d'environnement Vercel."
-            });
+            return res.status(500).json({ error: "GEMINI_API_KEY manquante." });
         }
 
-        /* ====================================================
-           BODY
-           ==================================================== */
-
         const body = req.body || {};
-
         const mode = body.mode || "scan";
         const images = body.images || null;
-
         const imageBase64 = body.imageBase64;
         const mimeType = body.mimeType || "image/jpeg";
         const asset = body.asset || "AUTO";
         const timeframe = body.timeframe || "AUTO";
         const userPrompt = body.prompt || "";
 
-        /* ====================================================
-           VALIDATION
-           ==================================================== */
-
         const isMultiTF = (mode === "multi-tf" && Array.isArray(images) && images.length > 0);
+        const isAudit = (mode === "audit");
 
         if (!isMultiTF && !imageBase64) {
-            return res.status(400).json({
-                error: "Aucune image n'a été envoyée."
-            });
+            return res.status(400).json({ error: "Aucune image envoyée." });
         }
-
-        if (isMultiTF) {
-            for (let i = 0; i < images.length; i++) {
-                const img = images[i];
-                if (!img || !img.imageBase64) {
-                    return res.status(400).json({
-                        error: `Image ${i + 1} manquante.`
-                    });
-                }
-                if (!img.timeframe) {
-                    return res.status(400).json({
-                        error: `Timeframe manquant pour l'image ${i + 1}.`
-                    });
-                }
-            }
-        }
-
-        /* ====================================================
-           CHOIX DU PROMPT
-           ==================================================== */
 
         let finalPrompt;
 
-        if (mode === "audit") {
-
+        if (isAudit) {
             finalPrompt = buildAuditPrompt(asset, timeframe, userPrompt);
-
         } else if (isMultiTF) {
-
             finalPrompt = buildMultiTFPrompt(images);
-
         } else {
-
             const marketType = classifyMarket(asset);
-
-            console.log("🎯 Marché classifié :", marketType, "| Actif :", asset);
-
             switch (marketType) {
                 case "GOLD":
                     finalPrompt = buildGoldSMCPrompt(asset, timeframe, userPrompt);
@@ -113,10 +57,6 @@ export default async function handler(req, res) {
                     break;
             }
         }
-
-        /* ====================================================
-           CONSTRUCTION DES PARTS GEMINI
-           ==================================================== */
 
         const imageParts = isMultiTF
             ? images.map(img => ({
@@ -132,14 +72,8 @@ export default async function handler(req, res) {
                 }
             }];
 
-        /* ====================================================
-           GEMINI
-           ==================================================== */
-
         const model = "gemini-3.6-flash";
-
-        const endpoint =
-            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
         const geminiResponse = await fetch(endpoint, {
             method: "POST",
@@ -148,24 +82,13 @@ export default async function handler(req, res) {
                 "x-goog-api-key": apiKey
             },
             body: JSON.stringify({
-                contents: [
-                    {
-                        role: "user",
-                        parts: [
-                            { text: finalPrompt },
-                            ...imageParts
-                        ]
-                    }
-                ],
-                generationConfig: {
-                    responseMimeType: "application/json"
-                }
+                contents: [{
+                    role: "user",
+                    parts: [{ text: finalPrompt }, ...imageParts]
+                }],
+                generationConfig: { responseMimeType: "application/json" }
             })
         });
-
-        /* ====================================================
-           ERREUR GEMINI
-           ==================================================== */
 
         if (!geminiResponse.ok) {
             const errorText = await geminiResponse.text();
@@ -176,12 +99,7 @@ export default async function handler(req, res) {
             });
         }
 
-        /* ====================================================
-           RÉPONSE
-           ==================================================== */
-
         const geminiData = await geminiResponse.json();
-
         const rawText = geminiData
             ?.candidates?.[0]
             ?.content?.parts
@@ -190,27 +108,13 @@ export default async function handler(req, res) {
             .trim();
 
         if (!rawText) {
-            return res.status(502).json({
-                error: "Gemini n'a retourné aucun résultat."
-            });
+            return res.status(502).json({ error: "Aucun résultat Gemini." });
         }
-
-        /* ====================================================
-           PARSING
-           ==================================================== */
 
         const parsed = parseJsonSafely(rawText);
-
         if (!parsed) {
-            console.error("JSON invalide:", rawText);
-            return res.status(502).json({
-                error: "Gemini a retourné un JSON invalide."
-            });
+            return res.status(502).json({ error: "JSON invalide retourné par Gemini." });
         }
-
-        /* ====================================================
-           NORMALISATION
-           ==================================================== */
 
         const result = normalizeResult(parsed, asset, timeframe, mode);
         validateTradeLevels(result);
@@ -219,9 +123,7 @@ export default async function handler(req, res) {
 
     } catch (error) {
         console.error("ARKAS API ERROR:", error);
-        return res.status(500).json({
-            error: error.message || "Erreur interne du serveur."
-        });
+        return res.status(500).json({ error: error.message || "Erreur serveur." });
     }
 }
 
@@ -232,215 +134,36 @@ export default async function handler(req, res) {
 
 function classifyMarket(asset) {
     const a = String(asset || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-
     if (a.includes("XAU") || a.includes("GOLD")) return "GOLD";
-
-    const forexPairs = [
-        "EURUSD", "GBPUSD", "USDJPY", "USDCHF",
-        "AUDUSD", "NZDUSD", "USDCAD",
-        "EURJPY", "GBPJPY", "EURGBP", "EURCHF"
-    ];
-
-    if (forexPairs.some(p => a.includes(p))) return "FOREX";
     if (/^[A-Z]{6}$/.test(a)) return "FOREX";
     if (a.includes("BTC") || a.includes("ETH")) return "CRYPTO_MAJOR";
-
-    const indices = [
-        "US30", "NAS100", "US500", "SP500",
-        "GER40", "DAX", "UK100", "JP225"
-    ];
-
-    if (indices.some(i => a.includes(i))) return "INDICES";
-
+    if (a.includes("US30") || a.includes("NAS100") || a.includes("US500")) return "INDICES";
     return "OTHER";
 }
 
 
 /* ============================================================
-   PROMPT MULTI-TIMEFRAME
+   PROMPT AUDIT
    ============================================================ */
 
-function buildMultiTFPrompt(images) {
+function buildAuditPrompt(asset, timeframe, userPrompt) {
+    return `Tu es ARKAS SCAN AI en MODE AUDIT.
 
-    const count = images.length;
+Analyse la capture qui contient une analyse utilisateur.
+Vérifie-la indépendamment.
 
-    return `
-Tu es ARKAS SCAN AI, expert en analyse multi-timeframe (SMC + ICT + Price Action).
+Étapes :
+1. Lis les annotations (Entry, SL, TP, flèches, zones)
+2. Fais une analyse indépendante
+3. Compare
+4. Statue : VALIDATED / CORRECT / PREMATURE / INVALID / UNCLEAR
+5. Propose une correction chiffrée
 
-============================================================
-ANALYSE MULTI-TIMEFRAME AVEC DÉTECTION AUTO
-============================================================
-
-Tu reçois ${count} capture(s) SANS indication de timeframe.
-
-============================================================
-ÉTAPE 1 — DÉTECTION DU TIMEFRAME
-============================================================
-
-Pour CHAQUE image, tu dois DÉTECTER le timeframe en analysant :
-- Les bougies (nombre, taille)
-- L'échelle de temps (M1, M5, M15, M30, H1, H4, D1, W1)
-- Les indicateurs visibles (si affichés)
-- Le contexte général
-
-Timeframes possibles : M1, M5, M15, M30, H1, H4, D1, W1
-
-Si tu ne peux PAS déterminer le timeframe → retourne "UNKNOWN".
-N'INVENTE JAMAIS un timeframe.
-
-============================================================
-ÉTAPE 2 — ANALYSE PAR TIMEFRAME
-============================================================
-
-Pour chaque image, identifie :
-- Le timeframe détecté
-- Le biais directionnel (BUY / SELL / NEUTRAL)
-- La structure (BOS, CHoCH, OB, FVG, liquidité)
-- Les zones clés
-
-============================================================
-ÉTAPE 3 — CONFLUENCE
-============================================================
-
-- ALIGNED      → tous les TF vont dans le même sens
-- PARTIAL      → 2 sur 3 alignés
-- DISAGREEMENT → désaccord
-- NEUTRAL      → aucun biais
-
-============================================================
-ÉTAPE 4 — SIGNAL FINAL
-============================================================
-
-- BUY NOW / SELL NOW      → confluence totale
-- BUY LIMIT / SELL LIMIT  → attente retour zone
-- WAIT                    → désaccord
-
-============================================================
-FORMAT JSON (aucun Markdown)
-============================================================
-
-{
-  "asset": "",
-  "market_type": "",
-  "strategy_applied": "MULTI_TF",
-  "timeframes_analyzed": ["H4", "H1", "M15"],
-  "tf_analysis": [
-    {
-      "image_index": 1,
-      "timeframe": "H4",
-      "bias": "BUY|SELL|NEUTRAL",
-      "structure": "",
-      "key_zone": ""
-    }
-  ],
-  "confluence_status": "ALIGNED|PARTIAL|DISAGREEMENT|NEUTRAL",
-  "signal": "BUY NOW|SELL NOW|BUY LIMIT|SELL LIMIT|WAIT",
-  "direction": "BUY|SELL|WAIT|UNKNOWN",
-  "confidence_percent": 0,
-  "entry": null,
-  "sl": null,
-  "tp1": null,
-  "tp2": null,
-  "tp3": null,
-  "rr": null,
-  "arkas_score": 0,
-  "structure": "",
-  "reason": "",
-  "primary_scenario": "",
-  "alternative_scenario": "",
-  "invalidation": "",
-  "zones": [],
-  "risk_management": {
-    "risk_percent": "1%",
-    "recommendation": ""
-  },
-  "economic_news": "",
-  "risk_warning": ""
-}
-
-============================================================
-INSTRUCTIONS FINALES
-============================================================
-
-- IMPORTANT : détecte le timeframe de CHAQUE image.
-- Le champ "tf_analysis" DOIT avoir un élément par image, dans l'ordre.
-- Réponds UNIQUEMENT en JSON valide.
-- Ne force JAMAIS un trade.
-`;
-}
-
-
-/* ============================================================
-   PROMPT OR (SMC)
-   ============================================================ */
-
-function buildGoldSMCPrompt(asset, timeframe, userPrompt) {
-    return `
-Tu es ARKAS SCAN AI, expert en Smart Money Concepts.
-
-MARCHÉ : ${asset} (OR — SMC PUR)
-TIMEFRAME : ${timeframe}
-
-RÈGLE : NE JAMAIS RESTER PASSIF.
-Propose AU MOINS 2 scénarios BUY LIMIT / SELL LIMIT.
-
-FORMAT JSON :
+Réponds UNIQUEMENT avec ce JSON :
 {
   "asset": "",
   "timeframe": "",
-  "market_type": "GOLD",
-  "strategy_applied": "SMC",
-  "signal": "BUY NOW|SELL NOW|BUY LIMIT|SELL LIMIT|WAIT",
-  "direction": "BUY|SELL|WAIT|UNKNOWN",
-  "confidence_percent": 0,
-  "entry": null,
-  "sl": null,
-  "tp1": null,
-  "tp2": null,
-  "tp3": null,
-  "rr": null,
-  "arkas_score": 0,
-  "structure": "",
-  "liquidity": "",
-  "order_block": "",
-  "fvg": "",
-  "zones": [],
-  "primary_scenario": "",
-  "alternative_scenario": "",
-  "invalidation": "",
-  "reason": "",
-  "risk_management": {
-    "risk_percent": "1%",
-    "recommendation": ""
-  },
-  "economic_news": "",
-  "risk_warning": ""
-}
-
-PROMPT UTILISATEUR : ${userPrompt}
-`;
-}
-
-
-/* ============================================================
-   PROMPT FOREX (SMC + PA)
-   ============================================================ */
-
-function buildForexHybridPrompt(asset, timeframe, userPrompt) {
-    return `
-Tu es ARKAS SCAN AI, expert SMC + Price Action.
-
-MARCHÉ : ${asset} (FOREX)
-TIMEFRAME : ${timeframe}
-
-Analyse SMC + Price Action + confluence.
-
-FORMAT JSON :
-{
-  "asset": "",
-  "timeframe": "",
-  "market_type": "FOREX",
-  "strategy_applied": "SMC_PA_HYBRID",
+  "strategy_applied": "AUDIT",
   "signal": "",
   "direction": "",
   "confidence_percent": 0,
@@ -456,116 +179,14 @@ FORMAT JSON :
   "order_block": "",
   "fvg": "",
   "price_action": "",
-  "confluence_status": "ALIGNED|PARTIAL|DISAGREEMENT|NEUTRAL",
-  "zones": [],
   "primary_scenario": "",
   "alternative_scenario": "",
   "invalidation": "",
-  "reason": "",
-  "risk_management": {
-    "risk_percent": "1%",
-    "recommendation": ""
-  },
-  "economic_news": "",
-  "risk_warning": ""
-}
-
-PROMPT UTILISATEUR : ${userPrompt}
-`;
-}
-
-
-/* ============================================================
-   PROMPT INDICES / CRYPTO (PA SIMPLIFIÉE)
-   ============================================================ */
-
-function buildSimplePriceActionPrompt(asset, timeframe, marketType, userPrompt) {
-    return `
-Tu es ARKAS SCAN AI en mode Price Action simplifiée.
-
-MARCHÉ : ${asset} (${marketType})
-TIMEFRAME : ${timeframe}
-
-Outils : Supports, Résistances, Trendlines, Cassure, Retest, Momentum.
-
-FORMAT JSON :
-{
-  "asset": "",
-  "timeframe": "",
-  "market_type": "${marketType}",
-  "strategy_applied": "PRICE_ACTION_SIMPLIFIED",
-  "signal": "",
-  "direction": "",
-  "confidence_percent": 0,
-  "entry": null,
-  "sl": null,
-  "tp1": null,
-  "tp2": null,
-  "tp3": null,
-  "rr": null,
-  "arkas_score": 0,
-  "structure": "",
-  "supports_resistances": "",
-  "trendlines": "",
-  "breakout": "",
-  "retest": "",
-  "momentum": "",
-  "zones": [],
-  "primary_scenario": "",
-  "alternative_scenario": "",
-  "invalidation": "",
-  "reason": "",
-  "risk_management": {
-    "risk_percent": "1%",
-    "recommendation": ""
-  },
-  "economic_news": "",
-  "risk_warning": ""
-}
-
-PROMPT UTILISATEUR : ${userPrompt}
-`;
-}
-
-
-/* ============================================================
-   PROMPT AUDIT
-   ============================================================ */
-
-function buildAuditPrompt(asset, timeframe, userPrompt) {
-    return `
-Tu es ARKAS SCAN AI en MODE AUDIT.
-
-MARCHÉ : ${asset}
-TIMEFRAME : ${timeframe}
-
-Vérifie l'analyse utilisateur :
-1. Lis les annotations
-2. Fais une analyse indépendante
-3. Compare
-4. Statue : VALIDATED / CORRECT / PREMATURE / INVALID / UNCLEAR
-5. Propose une correction chiffrée
-
-FORMAT JSON :
-{
-  "asset": "",
-  "timeframe": "",
-  "strategy_applied": "AUDIT",
-  "signal": "",
-  "direction": "",
-  "confidence_percent": 0,
-  "entry": null,
-  "sl": null,
-  "tp1": null,
-  "tp2": null,
-  "tp3": null,
-  "rr": null,
-  "arkas_score": 0,
-  "zones": [],
   "reason": "",
   "risk_management": {},
   "economic_news": "",
   "risk_warning": "",
+  "zones": [],
   "audit": {
     "status": "VALIDATED|CORRECT|PREMATURE|INVALID|UNCLEAR",
     "verdict": "",
@@ -585,18 +206,101 @@ FORMAT JSON :
   }
 }
 
-PROMPT UTILISATEUR : ${userPrompt}
-`;
+Prompt utilisateur : ${userPrompt}`;
 }
 
 
 /* ============================================================
-   PARSING JSON
+   PROMPT MULTI-TIMEFRAME
+   ============================================================ */
+
+function buildMultiTFPrompt(images) {
+    const count = images.length;
+
+    return `Tu es ARKAS SCAN AI, expert en analyse multi-timeframe.
+
+Tu reçois ${count} capture(s) SANS indication de timeframe.
+
+ÉTAPE 1 — DÉTECTE le timeframe de CHAQUE image :
+M1, M5, M15, M30, H1, H4, D1, W1.
+Si impossible → "UNKNOWN".
+
+ÉTAPE 2 — ANALYSE chaque timeframe :
+- Biais (BUY/SELL/NEUTRAL)
+- Structure (BOS, CHoCH, OB, FVG)
+- Zones clés
+
+ÉTAPE 3 — CONFLUENCE :
+- ALIGNED / PARTIAL / DISAGREEMENT / NEUTRAL
+
+ÉTAPE 4 — SIGNAL :
+- BUY NOW / SELL NOW / BUY LIMIT / SELL LIMIT / WAIT
+
+Réponds UNIQUEMENT avec ce JSON :
+{
+  "asset": "",
+  "market_type": "",
+  "strategy_applied": "MULTI_TF",
+  "timeframes_analyzed": [],
+  "tf_analysis": [
+    { "image_index": 1, "timeframe": "H4", "bias": "BUY", "structure": "", "key_zone": "" }
+  ],
+  "confluence_status": "ALIGNED|PARTIAL|DISAGREEMENT|NEUTRAL",
+  "signal": "",
+  "direction": "",
+  "confidence_percent": 0,
+  "entry": null,
+  "sl": null,
+  "tp1": null,
+  "tp2": null,
+  "tp3": null,
+  "rr": null,
+  "arkas_score": 0,
+  "structure": "",
+  "reason": "",
+  "primary_scenario": "",
+  "alternative_scenario": "",
+  "invalidation": "",
+  "zones": [],
+  "risk_management": { "risk_percent": "1%", "recommendation": "" },
+  "economic_news": "",
+  "risk_warning": ""
+}`;
+}
+
+
+/* ============================================================
+   PROMPTS SIMPLES
+   ============================================================ */
+
+function buildGoldSMCPrompt(asset, timeframe, userPrompt) {
+    return `Tu es ARKAS SCAN AI, expert SMC.
+MARCHÉ : ${asset} — ${timeframe}
+Réponds en JSON avec : asset, market_type, strategy_applied, signal, direction, confidence_percent, entry, sl, tp1, tp2, tp3, rr, arkas_score, structure, liquidity, order_block, fvg, zones, primary_scenario, alternative_scenario, invalidation, reason, risk_management, economic_news, risk_warning.
+Prompt : ${userPrompt}`;
+}
+
+function buildForexHybridPrompt(asset, timeframe, userPrompt) {
+    return `Tu es ARKAS SCAN AI, expert SMC + Price Action.
+MARCHÉ : ${asset} — ${timeframe}
+Réponds en JSON avec : asset, market_type, strategy_applied, signal, direction, confidence_percent, entry, sl, tp1, tp2, tp3, rr, arkas_score, structure, zones, primary_scenario, invalidation, reason, risk_management.
+Prompt : ${userPrompt}`;
+}
+
+function buildSimplePriceActionPrompt(asset, timeframe, marketType, userPrompt) {
+    return `Tu es ARKAS SCAN AI en mode Price Action.
+MARCHÉ : ${asset} — ${timeframe} (${marketType})
+Réponds en JSON avec : asset, market_type, strategy_applied, signal, direction, confidence_percent, entry, sl, tp1, tp2, tp3, rr, arkas_score, structure, zones, reason, risk_management.
+Prompt : ${userPrompt}`;
+}
+
+
+/* ============================================================
+   PARSING + NORMALISATION
    ============================================================ */
 
 function parseJsonSafely(text) {
     if (!text) return null;
-
     try { return JSON.parse(text); } catch {}
 
     let cleaned = text
@@ -609,21 +313,13 @@ function parseJsonSafely(text) {
 
     const first = cleaned.indexOf("{");
     const last = cleaned.lastIndexOf("}");
-
     if (first !== -1 && last !== -1 && last > first) {
         try { return JSON.parse(cleaned.slice(first, last + 1)); } catch {}
     }
-
     return null;
 }
 
-
-/* ============================================================
-   NORMALISATION
-   ============================================================ */
-
 function normalizeResult(data, asset, timeframe, mode) {
-
     const result = {
         asset: data.asset || asset,
         timeframe: data.timeframe || timeframe,
@@ -644,77 +340,48 @@ function normalizeResult(data, asset, timeframe, mode) {
         order_block: data.order_block || "",
         fvg: data.fvg || "",
         price_action: data.price_action || "",
-        supports_resistances: data.supports_resistances || "",
-        trendlines: data.trendlines || "",
-        breakout: data.breakout || "",
-        retest: data.retest || "",
-        momentum: data.momentum || "",
-        confluence_status: data.confluence_status || null,
         timeframes_analyzed: Array.isArray(data.timeframes_analyzed) ? data.timeframes_analyzed : [],
         tf_analysis: Array.isArray(data.tf_analysis) ? data.tf_analysis : [],
+        confluence_status: data.confluence_status || null,
         zones: normalizeZones(data.zones),
         primary_scenario: data.primary_scenario || "",
         alternative_scenario: data.alternative_scenario || "",
         invalidation: data.invalidation || "",
         risk_management: data.risk_management || {},
-        economic_news: data.economic_news || "Non disponible — vérifier le calendrier.",
+        economic_news: data.economic_news || "Non disponible",
         reason: data.reason || "",
-        risk_warning: data.risk_warning || "L'analyse technique ne garantit pas un résultat."
+        risk_warning: data.risk_warning || ""
     };
 
-    if (mode === "audit") {
-        result.audit = normalizeAudit(data.audit);
-    }
+    if (mode === "audit") result.audit = normalizeAudit(data.audit);
 
     result.confidence_percent = clamp(result.confidence_percent, 0, 100);
     result.arkas_score = clamp(result.arkas_score, 0, 100);
-
     return result;
 }
 
-
 function normalizeZones(zones) {
     if (!Array.isArray(zones)) return [];
-
-    return zones
-        .map((z, idx) => ({
-            id: String(z.id || String.fromCharCode(65 + idx)),
-            type: String(z.type || "BUY_LIMIT").toUpperCase(),
-            zone_label: z.zone_label || "",
-            zone_price: z.zone_price || "",
-            entry: normalizeNumber(z.entry),
-            sl: normalizeNumber(z.sl),
-            tp1: normalizeNumber(z.tp1),
-            tp2: normalizeNumber(z.tp2),
-            tp3: normalizeNumber(z.tp3),
-            rr: normalizeNumber(z.rr),
-            trigger: z.trigger || "",
-            probability: z.probability || "moyenne",
-            invalidation: z.invalidation || "",
-            priority: Number(z.priority) || (idx + 1)
-        }))
-        .filter(z => z.entry !== null || z.zone_price)
-        .sort((a, b) => a.priority - b.priority);
+    return zones.map((z, i) => ({
+        id: z.id || String.fromCharCode(65 + i),
+        type: String(z.type || "BUY_LIMIT").toUpperCase(),
+        zone_label: z.zone_label || "",
+        zone_price: z.zone_price || "",
+        entry: normalizeNumber(z.entry),
+        sl: normalizeNumber(z.sl),
+        tp1: normalizeNumber(z.tp1),
+        tp2: normalizeNumber(z.tp2),
+        tp3: normalizeNumber(z.tp3),
+        rr: normalizeNumber(z.rr),
+        priority: z.priority || (i + 1)
+    }));
 }
-
 
 function normalizeAudit(audit) {
     audit = audit || {};
-    const detected = audit.detected_user_analysis || {};
     const corrected = audit.corrected_trade || {};
-
     return {
-        status: normalizeAuditStatus(audit.status),
-        detected_user_analysis: {
-            direction: detected.direction || "UNKNOWN",
-            entry: normalizeNumber(detected.entry),
-            sl: normalizeNumber(detected.sl),
-            tp1: normalizeNumber(detected.tp1),
-            tp2: normalizeNumber(detected.tp2),
-            tp3: normalizeNumber(detected.tp3),
-            annotations: Array.isArray(detected.annotations) ? detected.annotations : [],
-            claimed_setup: detected.claimed_setup || ""
-        },
+        status: audit.status || "UNCLEAR",
         verdict: audit.verdict || "",
         strengths: Array.isArray(audit.strengths) ? audit.strengths : [],
         errors: Array.isArray(audit.errors) ? audit.errors : [],
@@ -727,48 +394,28 @@ function normalizeAudit(audit) {
             tp2: normalizeNumber(corrected.tp2),
             tp3: normalizeNumber(corrected.tp3),
             rr: normalizeNumber(corrected.rr),
-            validation_probability: clamp(normalizeNumber(corrected.validation_probability) || 0, 0, 100)
+            validation_probability: normalizeNumber(corrected.validation_probability) || 0
         }
     };
 }
 
-
 function validateTradeLevels(result) {
-    const direction = String(result.direction || "").toUpperCase();
-    const { entry, sl, tp1, tp2, tp3 } = result;
+    const dir = String(result.direction || "").toUpperCase();
+    if (dir === "WAIT" || result.signal === "WAIT") { result.trade_valid = true; return; }
 
-    if (direction === "WAIT" || result.signal === "WAIT") {
-        result.trade_valid = true;
-        return;
-    }
-
-    if (!isFiniteNumber(entry) || !isFiniteNumber(sl) ||
-        !isFiniteNumber(tp1) || !isFiniteNumber(tp2)) {
+    const { entry, sl, tp1 } = result;
+    if (!isFiniteNumber(entry) || !isFiniteNumber(sl) || !isFiniteNumber(tp1)) {
         result.trade_valid = false;
         return;
     }
-
-    if (direction === "BUY") {
-        const valid = sl < entry && entry < tp1 && tp1 < tp2 &&
-            (tp3 === null || tp3 > tp2);
-        if (!valid) {
-            result.trade_valid = false;
-            result.risk_warning = "Niveaux BUY invalides.";
-        }
-        return;
-    }
-
-    if (direction === "SELL") {
-        const valid = tp2 < tp1 && tp1 < entry && sl > entry &&
-            (tp3 === null || tp3 < tp2);
-        if (!valid) {
-            result.trade_valid = false;
-            result.risk_warning = "Niveaux SELL invalides.";
-        }
-        return;
+    if (dir === "BUY" && !(sl < entry && entry < tp1)) {
+        result.trade_valid = false;
+    } else if (dir === "SELL" && !(tp1 < entry && entry < sl)) {
+        result.trade_valid = false;
+    } else {
+        result.trade_valid = true;
     }
 }
-
 
 function inferDirection(signal) {
     const v = String(signal || "").toUpperCase();
@@ -777,34 +424,17 @@ function inferDirection(signal) {
     return "WAIT";
 }
 
-function normalizeAuditStatus(status) {
-    const allowed = ["VALIDATED", "CORRECT", "PREMATURE", "INVALID", "UNCLEAR"];
-    const v = String(status || "UNCLEAR").toUpperCase();
-    return allowed.includes(v) ? v : "UNCLEAR";
-}
-
-function normalizeNumber(value) {
-    if (value === null || value === undefined || value === "") return null;
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    const n = Number(String(value).replace(",", ".").replace(/[^0-9eE.+-]/g, ""));
+function normalizeNumber(v) {
+    if (v === null || v === undefined || v === "") return null;
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+    const n = Number(String(v).replace(",", ".").replace(/[^0-9eE.+-]/g, ""));
     return Number.isFinite(n) ? n : null;
 }
 
-function isFiniteNumber(v) {
-    return typeof v === "number" && Number.isFinite(v);
-}
-
-function clamp(v, min, max) {
-    if (!isFiniteNumber(v)) return 0;
-    return Math.min(Math.max(v, min), max);
-}
+function isFiniteNumber(v) { return typeof v === "number" && Number.isFinite(v); }
+function clamp(v, min, max) { return isFiniteNumber(v) ? Math.min(Math.max(v, min), max) : 0; }
 
 function safeGeminiError(text) {
-    try {
-        const p = JSON.parse(text);
-        return p?.error?.message || "Erreur Gemini.";
-    } catch {
-        return "Erreur Gemini.";
-    }
+    try { const p = JSON.parse(text); return p?.error?.message || "Erreur"; }
+    catch { return "Erreur Gemini"; }
 }
-

@@ -1,5 +1,6 @@
 /* =========================================================
    ARKAS SCAN AI V2 — DASHBOARD MULTI-TIMEFRAME + SIMULATION
+   Détection auto du timeframe + Effet scan visible
    ========================================================= */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -14,7 +15,6 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     let isProcessing = false;
-    let lastAnalysis = null;
 
     /* =========================================================
        RÉFÉRENCES DOM
@@ -165,11 +165,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const slotEl = document.querySelector(`.tf-slot[data-slot="${i}"]`);
             const imgEl = document.getElementById(`tf-img-${i}`);
+            const detectedEl = document.getElementById(`tf-detected-${i}`);
 
             if (slots[i].base64) {
                 imgEl.src = slots[i].base64;
                 slotEl.style.display = "block";
                 hasAny = true;
+
+                if (detectedEl) {
+                    detectedEl.classList.add("hidden");
+                    detectedEl.textContent = "Détection...";
+                }
             } else {
                 imgEl.src = "";
                 slotEl.style.display = "none";
@@ -187,10 +193,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    for (let i = 1; i <= MAX_IMAGES; i++) {
-        const selectEl = document.getElementById(`tf-select-${i}`);
-        if (selectEl) selectEl.addEventListener("change", updateAnalyzeButton);
-    }
+    /* =========================================================
+       RETIRER
+       ========================================================= */
 
     document.querySelectorAll(".tf-remove-btn").forEach((btn) => {
         btn.addEventListener("click", (e) => {
@@ -202,8 +207,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function removeSlot(n) {
         slots[n] = { base64: null, mimeType: null };
-        const selectEl = document.getElementById(`tf-select-${n}`);
-        if (selectEl) selectEl.value = "";
         renderPreviews();
         updateAnalyzeButton();
     }
@@ -212,8 +215,8 @@ document.addEventListener("DOMContentLoaded", () => {
         resetBtn.addEventListener("click", () => {
             for (let i = 1; i <= MAX_IMAGES; i++) {
                 slots[i] = { base64: null, mimeType: null };
-                const selectEl = document.getElementById(`tf-select-${i}`);
-                if (selectEl) selectEl.value = "";
+                const scanEl = document.getElementById(`scan-preview-${i}`);
+                if (scanEl) scanEl.classList.remove("is-scanning");
             }
             if (fileInput) fileInput.value = "";
             resultsSection.classList.add("hidden");
@@ -228,24 +231,14 @@ document.addEventListener("DOMContentLoaded", () => {
        ========================================================= */
 
     function updateAnalyzeButton() {
-        const filled = [];
-
-        for (let i = 1; i <= MAX_IMAGES; i++) {
-            if (!slots[i].base64) continue;
-            const tf = document.getElementById(`tf-select-${i}`)?.value;
-            if (tf) filled.push({ slot: i, tf });
-        }
-
-        const totalFilled = Object.values(slots).filter(s => s.base64).length;
-        const can = filled.length >= 1 && !isProcessing;
+        const filled = Object.values(slots).filter(s => s.base64).length;
+        const can = filled >= 1 && !isProcessing;
         analyzeBtn.disabled = !can;
 
-        if (totalFilled === 0) {
+        if (filled === 0) {
             showStatus("Importe au moins 1 capture.", "info");
-        } else if (filled.length < totalFilled) {
-            showStatus("⚠️ Donne un timeframe à chaque image.", "info");
         } else {
-            showStatus(`✅ ${filled.length} image(s) prête(s).`, "success");
+            showStatus(`✅ ${filled} image(s) prête(s). Clique sur Scanner.`, "success");
         }
     }
 
@@ -260,21 +253,34 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    /* ---- Effet scan sur les images ---- */
+    function startScanEffect() {
+        for (let i = 1; i <= MAX_IMAGES; i++) {
+            if (!slots[i].base64) continue;
+            const el = document.getElementById(`scan-preview-${i}`);
+            if (el) el.classList.add("is-scanning");
+        }
+    }
+
+    function stopScanEffect() {
+        for (let i = 1; i <= MAX_IMAGES; i++) {
+            const el = document.getElementById(`scan-preview-${i}`);
+            if (el) el.classList.remove("is-scanning");
+        }
+    }
+
     async function analyzeMultiTF() {
 
         const images = [];
 
         for (let i = 1; i <= MAX_IMAGES; i++) {
             if (!slots[i].base64) continue;
-            const tf = document.getElementById(`tf-select-${i}`)?.value;
-            if (!tf) continue;
 
             const clean = slots[i].base64.includes(",")
                 ? slots[i].base64.split(",")[1]
                 : slots[i].base64;
 
             images.push({
-                timeframe: tf,
                 imageBase64: clean,
                 mimeType: slots[i].mimeType || "image/jpeg"
             });
@@ -290,6 +296,9 @@ document.addEventListener("DOMContentLoaded", () => {
         resultsSection.classList.add("hidden");
         globalLoader.classList.remove("hidden");
         showStatus("🔍 Analyse en cours…", "loading");
+
+        /* Démarrage de l'effet scan */
+        startScanEffect();
 
         try {
             const controller = new AbortController();
@@ -311,7 +320,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!response.ok) throw new Error(data?.error || `Erreur ${response.status}`);
             if (!data) throw new Error("Aucune réponse.");
 
-            lastAnalysis = data;
+            /* Afficher les timeframes détectés sur chaque image */
+            displayDetectedTimeframes(data);
+
             renderResults(data);
             showStatus("✅ Analyse terminée.", "success");
 
@@ -319,9 +330,41 @@ document.addEventListener("DOMContentLoaded", () => {
             console.error(error);
             showStatus("❌ " + (error?.message || "Erreur."), "error");
         } finally {
+            stopScanEffect();
             globalLoader.classList.add("hidden");
             isProcessing = false;
             setButtonsDisabled(false);
+        }
+    }
+
+    /* =========================================================
+       AFFICHAGE DES TIMEFRAMES DÉTECTÉS
+       ========================================================= */
+
+    function displayDetectedTimeframes(data) {
+
+        const tfAnalysis = Array.isArray(data.tf_analysis) ? data.tf_analysis : [];
+
+        for (let i = 1; i <= MAX_IMAGES; i++) {
+
+            const detectedEl = document.getElementById(`tf-detected-${i}`);
+            if (!detectedEl) continue;
+
+            if (!slots[i].base64) {
+                detectedEl.classList.add("hidden");
+                continue;
+            }
+
+            const tf = tfAnalysis[i - 1];
+
+            if (tf && tf.timeframe) {
+                detectedEl.textContent = `📊 ${tf.timeframe} — ${tf.bias || "—"}`;
+                detectedEl.classList.remove("hidden");
+                detectedEl.className = `tf-detected tf-bias-${(tf.bias || "neutral").toLowerCase()}`;
+            } else {
+                detectedEl.textContent = "📊 Timeframe non détecté";
+                detectedEl.classList.remove("hidden");
+            }
         }
     }
 
@@ -509,7 +552,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const btn = document.getElementById("simulate-btn");
         if (!btn) return;
 
-        // Vérifier si le simulateur est disponible
         if (!window.ARKAS_SIMULATOR) {
             btn.disabled = true;
             btn.textContent = "🎮 Simulateur indisponible";
@@ -517,20 +559,16 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         btn.addEventListener("click", () => {
-
             const result = window.ARKAS_SIMULATOR.addTrade(data);
 
             if (result.success) {
                 btn.textContent = "✅ Trade ajouté !";
                 btn.disabled = true;
-
                 setTimeout(() => {
                     btn.textContent = "🎮 Simuler ce trade";
                     btn.disabled = false;
                 }, 2500);
-
                 renderSimulation();
-
             } else {
                 alert(result.message);
             }
@@ -608,157 +646,8 @@ document.addEventListener("DOMContentLoaded", () => {
         `;
     }
 
-    // Écouter les résultats
     window.addEventListener("arkas:trade-result", () => {
         renderSimulation();
     });
 
     /* =========================================================
-       HISTORIQUE
-       ========================================================= */
-
-    function saveToHistory(data) {
-        try {
-            const key = "arkas_signals_history";
-            const history = JSON.parse(localStorage.getItem(key) || "[]");
-            history.unshift({
-                id: Date.now(),
-                asset: data.asset || "—",
-                signal: data.signal || "WAIT",
-                direction: data.direction || "—",
-                entry: data.entry,
-                sl: data.sl,
-                tp1: data.tp1,
-                tp2: data.tp2,
-                tp3: data.tp3,
-                rr: data.rr,
-                confidence: data.confidence_percent,
-                score: data.arkas_score,
-                result: "PENDING",
-                date: new Date().toISOString()
-            });
-            localStorage.setItem(key, JSON.stringify(history.slice(0, 50)));
-        } catch (e) {}
-    }
-
-    function renderHistory() {
-        const container = document.getElementById("history-content");
-        const statsEl = {
-            total: document.getElementById("stat-total"),
-            win: document.getElementById("stat-win"),
-            loss: document.getElementById("stat-loss"),
-            rate: document.getElementById("stat-rate")
-        };
-
-        if (!container) return;
-
-        let history = [];
-        try { history = JSON.parse(localStorage.getItem("arkas_signals_history") || "[]"); } catch {}
-
-        if (!history.length) {
-            container.innerHTML = `
-                <div class="empty-result">
-                    <div>📭</div>
-                    <h3>Aucun signal enregistré</h3>
-                    <p>Les signaux copiés apparaîtront ici.</p>
-                </div>
-            `;
-            if (statsEl.total) statsEl.total.textContent = "0";
-            if (statsEl.win) statsEl.win.textContent = "0";
-            if (statsEl.loss) statsEl.loss.textContent = "0";
-            if (statsEl.rate) statsEl.rate.textContent = "—";
-            return;
-        }
-
-        const total = history.length;
-        const wins = history.filter(h => h.result === "WIN").length;
-        const losses = history.filter(h => h.result === "LOSS").length;
-        const rate = total ? Math.round((wins / total) * 100) : 0;
-
-        if (statsEl.total) statsEl.total.textContent = total;
-        if (statsEl.win) statsEl.win.textContent = wins;
-        if (statsEl.loss) statsEl.loss.textContent = losses;
-        if (statsEl.rate) statsEl.rate.textContent = `${rate}%`;
-
-        container.innerHTML = `
-            <div class="history-list">
-                ${history.map(h => `
-                    <div class="history-item">
-                        <div class="history-line">
-                            <strong>${escapeHtml(h.asset)}</strong>
-                            <span class="history-signal">${escapeHtml(h.signal)}</span>
-                        </div>
-                        <div class="history-line">
-                            <small>${new Date(h.date).toLocaleString("fr-FR")}</small>
-                        </div>
-                        <div class="history-line">
-                            <span>Entry : ${h.entry ?? "—"}</span>
-                            <span>SL : ${h.sl ?? "—"}</span>
-                            <span>TP1 : ${h.tp1 ?? "—"}</span>
-                        </div>
-                    </div>
-                `).join("")}
-            </div>
-        `;
-    }
-
-    /* =========================================================
-       HELPERS
-       ========================================================= */
-
-    function setButtonsDisabled(d) {
-        if (analyzeBtn) analyzeBtn.disabled = d;
-        if (resetBtn) resetBtn.disabled = d;
-        if (importBtn) importBtn.disabled = d;
-    }
-
-    function showStatus(msg, type = "info") {
-        if (!analysisStatus) return;
-        analysisStatus.textContent = msg;
-        analysisStatus.className = "analysis-status status-" + type;
-    }
-
-    function resultCard(title, value) {
-        return `<div class="result-card"><span class="result-card-title">${escapeHtml(title)}</span><strong class="result-card-value">${escapeHtml(String(value))}</strong></div>`;
-    }
-
-    function detailBlock(title, value) {
-        return `<div class="detail-block"><h3>${escapeHtml(title)}</h3><p>${escapeHtml(String(value))}</p></div>`;
-    }
-
-    function safe(v, f = "—") {
-        if (v === null || v === undefined || v === "") return f;
-        return v;
-    }
-
-    function formatNumber(v) {
-        if (v === null || v === undefined || v === "") return "—";
-        return String(v);
-    }
-
-    function getSignalClass(signal) {
-        const s = String(signal).toUpperCase();
-        if (s.includes("BUY")) return "signal-buy";
-        if (s.includes("SELL")) return "signal-sell";
-        return "signal-wait";
-    }
-
-    function escapeHtml(v) {
-        return String(v)
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-    }
-
-    /* =========================================================
-       INITIALISATION
-       ========================================================= */
-
-    renderPreviews();
-    updateAnalyzeButton();
-    renderHistory();
-    setTimeout(() => renderSimulation(), 500);
-
-});

@@ -167,8 +167,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const imgEl = document.getElementById(`tf-img-${i}`);
             const detectedEl = document.getElementById(`tf-detected-${i}`);
 
+            if (!slotEl) continue;
+
             if (slots[i].base64) {
-                imgEl.src = slots[i].base64;
+                if (imgEl) imgEl.src = slots[i].base64;
                 slotEl.style.display = "block";
                 hasAny = true;
 
@@ -177,7 +179,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     detectedEl.textContent = "Détection...";
                 }
             } else {
-                imgEl.src = "";
+                if (imgEl) imgEl.src = "";
                 slotEl.style.display = "none";
             }
         }
@@ -233,7 +235,8 @@ document.addEventListener("DOMContentLoaded", () => {
     function updateAnalyzeButton() {
         const filled = Object.values(slots).filter(s => s.base64).length;
         const can = filled >= 1 && !isProcessing;
-        analyzeBtn.disabled = !can;
+
+        if (analyzeBtn) analyzeBtn.disabled = !can;
 
         if (filled === 0) {
             showStatus("Importe au moins 1 capture.", "info");

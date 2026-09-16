@@ -1747,6 +1747,9 @@ footer {
 /* =========================================================
    32. MULTI-TIMEFRAME PREVIEW
    ========================================================= */
+/* =========================================================
+   32. MULTI-TIMEFRAME PREVIEW + EFFET SCAN
+   ========================================================= */
 
 .tf-slot {
   margin-bottom: 1rem;
@@ -1772,25 +1775,26 @@ footer {
   letter-spacing: 0.03em;
 }
 
-.tf-select {
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-input);
-  border: 1px solid var(--border-input);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: 0.85rem;
-  font-family: inherit;
-  outline: none;
-  cursor: pointer;
-  min-width: 130px;
+.tf-detected {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.3rem 0.75rem;
+  border-radius: 20px;
+  letter-spacing: 0.05em;
+  background: rgba(0, 230, 118, 0.15);
+  color: var(--color-primary);
+  border: 1px solid rgba(0, 230, 118, 0.3);
+  animation: fadeIn 0.3s ease both;
 }
 
-.tf-select:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-glow);
-}
+.tf-detected.hidden { display: none; }
 
-.tf-preview {
+.tf-detected.tf-bias-buy  { background: rgba(0, 230, 118, 0.15); color: var(--color-primary); border-color: rgba(0, 230, 118, 0.4); }
+.tf-detected.tf-bias-sell { background: rgba(255, 82, 82, 0.15); color: var(--color-danger); border-color: rgba(255, 82, 82, 0.4); }
+.tf-detected.tf-bias-neutral { background: rgba(100, 116, 139, 0.15); color: var(--text-muted); border-color: rgba(100, 116, 139, 0.4); }
+
+/* ---- Preview avec effet scan ---- */
+.scan-preview {
   position: relative;
   border-radius: var(--radius-sm);
   overflow: hidden;
@@ -1798,11 +1802,141 @@ footer {
   background: var(--bg-input);
 }
 
-.tf-preview img {
+.scan-preview img {
   display: block;
   width: 100%;
-  max-height: 200px;
+  max-height: 220px;
   object-fit: contain;
+}
+
+.scan-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.scan-preview.is-scanning .scan-overlay {
+  opacity: 1;
+}
+
+.scan-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0, 230, 118, 0.15) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 230, 118, 0.15) 1px, transparent 1px);
+  background-size: 30px 30px;
+  animation: gridPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes gridPulse {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+
+.scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--color-primary), transparent);
+  box-shadow: 0 0 20px var(--color-primary), 0 0 40px var(--color-primary);
+  animation: scanMove 1.8s linear infinite;
+}
+
+@keyframes scanMove {
+  0%   { top: 0; }
+  100% { top: 100%; }
+}
+
+.scan-corners .corner {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--color-primary);
+  animation: cornerPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes cornerPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
+.scan-corners .corner.top-left     { top: 8px;    left: 8px;  border-right: none; border-bottom: none; }
+.scan-corners .corner.top-right    { top: 8px;    right: 8px; border-left: none;  border-bottom: none; }
+.scan-corners .corner.bottom-left  { bottom: 8px; left: 8px;  border-right: none; border-top: none; }
+.scan-corners .corner.bottom-right { bottom: 8px; right: 8px; border-left: none;  border-top: none; }
+
+.scan-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  background: rgba(10, 14, 23, 0.85);
+  padding: 0.85rem 1.25rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-primary);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.3s ease both;
+}
+
+.scan-loader {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(0, 230, 118, 0.2);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  margin: 0 auto 0.5rem;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.scan-label {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  letter-spacing: 0.05em;
+}
+
+.scan-subtitle {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.15em;
+  margin-top: 0.15rem;
+}
+
+.scan-status {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(10, 14, 23, 0.9);
+  padding: 0.3rem 0.7rem;
+  border-radius: 20px;
+  font-size: 0.65rem;
+  color: var(--color-primary);
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  border: 1px solid rgba(0, 230, 118, 0.3);
+}
+
+.scan-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.4; transform: scale(0.7); }
 }
 
 .tf-remove-btn {
@@ -1819,10 +1953,10 @@ footer {
   cursor: pointer;
   transition: all var(--transition);
   font-family: inherit;
+  z-index: 10;
 }
 
 .tf-remove-btn:hover { background: var(--color-danger); }
-
 
 /* =========================================================
    33. ANALYSE PAR TIMEFRAME

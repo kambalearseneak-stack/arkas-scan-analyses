@@ -28,7 +28,7 @@
 
     <section class="hero">
         <h2>Analyse multi-timeframe avec ARKAS AI</h2>
-        <p>Sélectionne jusqu'à 3 captures de timeframes différents et détecte la confluence.</p>
+        <p>Sélectionne jusqu'à 3 captures et détecte la confluence.</p>
     </section>
 
     <!-- ================================================= -->
@@ -44,41 +44,19 @@
             </div>
         </div>
 
-        <!-- INPUT UNIQUE MULTIPLE -->
-        <input
-            id="chart-files"
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            multiple
-            hidden
-        >
+        <input id="chart-files" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>
 
-        <!-- ZONE D'IMPORT -->
-        <div
-            id="dropZone"
-            class="drop-zone"
-            tabindex="0"
-            role="button"
-            aria-label="Importer jusqu'à 3 captures"
-        >
+        <div id="dropZone" class="drop-zone" tabindex="0" role="button">
             <div class="upload-icon">📷</div>
             <h3>Importer jusqu'à 3 captures</h3>
             <p>Appuie ici pour choisir tes images</p>
             <small>JPG • PNG • WEBP — 10 MB max par image</small>
-
-            <button
-                id="import-btn"
-                type="button"
-                class="import-button"
-            >
+            <button id="import-btn" type="button" class="import-button">
                 📷 IMPORTER DES CAPTURES
             </button>
         </div>
 
-        <!-- APERÇUS -->
         <div id="preview-container" class="preview-container" style="display:none;">
-
-            <!-- SLOT 1 -->
             <div class="tf-slot" data-slot="1">
                 <div class="tf-slot-header">
                     <span class="tf-slot-number">Image 1</span>
@@ -100,7 +78,6 @@
                 </div>
             </div>
 
-            <!-- SLOT 2 -->
             <div class="tf-slot" data-slot="2">
                 <div class="tf-slot-header">
                     <span class="tf-slot-number">Image 2</span>
@@ -122,7 +99,6 @@
                 </div>
             </div>
 
-            <!-- SLOT 3 -->
             <div class="tf-slot" data-slot="3">
                 <div class="tf-slot-header">
                     <span class="tf-slot-number">Image 3</span>
@@ -143,10 +119,8 @@
                     <button type="button" class="tf-remove-btn" data-slot="3">✕ Retirer</button>
                 </div>
             </div>
-
         </div>
 
-        <!-- ACTIONS -->
         <div class="scanner-actions" id="scanner-actions" style="display:none;">
             <button id="analyze-btn" type="button" class="primary-button" disabled>
                 🔍 SCANNER LES CAPTURES
@@ -177,6 +151,51 @@
     </section>
 
     <!-- ================================================= -->
+    <!-- SIMULATION                                        -->
+    <!-- ================================================= -->
+
+    <section id="simulation-section" class="results-section">
+        <div class="section-title">
+            <span class="icon">🎮</span>
+            <div>
+                <h2>Simulation de trades</h2>
+                <p>Suivi automatique TP / SL en temps réel.</p>
+            </div>
+        </div>
+
+        <div id="simulation-stats" class="history-stats">
+            <div class="history-stat">
+                <span>Total</span>
+                <strong id="sim-total">0</strong>
+            </div>
+            <div class="history-stat">
+                <span>Gagnants</span>
+                <strong id="sim-win" class="stat-win">0</strong>
+            </div>
+            <div class="history-stat">
+                <span>Perdants</span>
+                <strong id="sim-loss" class="stat-loss">0</strong>
+            </div>
+            <div class="history-stat">
+                <span>En cours</span>
+                <strong id="sim-pending">0</strong>
+            </div>
+            <div class="history-stat">
+                <span>Win rate</span>
+                <strong id="sim-rate">—</strong>
+            </div>
+        </div>
+
+        <div id="simulation-content">
+            <div class="empty-result">
+                <div>🎮</div>
+                <h3>Aucune simulation en cours</h3>
+                <p>Copie un signal et clique "Simuler ce trade".</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================================================= -->
     <!-- HISTORIQUE                                        -->
     <!-- ================================================= -->
 
@@ -185,7 +204,7 @@
             <span class="icon">📊</span>
             <div>
                 <h2>Historique des signaux</h2>
-                <p>Résultats et statistiques.</p>
+                <p>Signaux copiés.</p>
             </div>
         </div>
 
@@ -216,10 +235,6 @@
             </div>
         </div>
     </section>
-
-    <!-- ================================================= -->
-    <!-- MÉTHODE                                           -->
-    <!-- ================================================= -->
 
     <section class="method-section">
         <h2>🧠 Méthode ARKAS</h2>
@@ -252,6 +267,7 @@
     </div>
 </div>
 
+<script src="simulator.js"></script>
 <script type="module" src="app.js"></script>
 <script type="module" src="dashboard.js"></script>
 

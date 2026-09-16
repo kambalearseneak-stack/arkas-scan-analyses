@@ -143,6 +143,204 @@ function classifyMarket(asset) {
 
 
 /* ============================================================
+   PROMPT MULTI-TIMEFRAME — AVEC SCÉNARIOS CHIFFRÉS
+   ============================================================ */
+
+function buildMultiTFPrompt(images) {
+    const count = images.length;
+
+    return `Tu es ARKAS SCAN AI, expert en analyse multi-timeframe (SMC + ICT + Price Action).
+
+============================================================
+ANALYSE MULTI-TIMEFRAME — ${count} CAPTURE(S)
+============================================================
+
+Tu reçois ${count} capture(s) SANS indication de timeframe.
+
+============================================================
+ÉTAPE 1 — DÉTECTE LE TIMEFRAME DE CHAQUE IMAGE
+============================================================
+
+Analyse les bougies, l'échelle, les indicateurs visibles.
+
+Timeframes possibles : M1, M5, M15, M30, H1, H4, D1, W1.
+Si impossible → "UNKNOWN".
+
+============================================================
+ÉTAPE 2 — ANALYSE CHAQUE TIMEFRAME
+============================================================
+
+Pour chaque image :
+- Biais (BUY / SELL / NEUTRAL)
+- Structure (BOS, CHoCH, OB, FVG, liquidité)
+- Zones clés
+
+============================================================
+ÉTAPE 3 — VÉRIFIE LA CONFLUENCE
+============================================================
+
+- ALIGNED      → tous les TF alignés (confiance +30%)
+- PARTIAL      → 2 sur 3 alignés (confiance normale)
+- DISAGREEMENT → désaccord (confiance -40%)
+- NEUTRAL      → aucun biais
+
+============================================================
+ÉTAPE 4 — SIGNAL PRINCIPAL
+============================================================
+
+- BUY NOW / SELL NOW      → confluence totale + entrée immédiate
+- BUY LIMIT / SELL LIMIT  → attente retour zone
+- WAIT                    → désaccord total
+
+============================================================
+ÉTAPE 5 — SCÉNARIOS MULTIPLES (OBLIGATOIRE)
+============================================================
+
+⚠️ RÈGLE ABSOLUE : CHAQUE SCÉNARIO DOIT AVOIR DES NIVEAUX CHIFFRÉS.
+
+Tu dois fournir exactement 4 scénarios :
+
+- Scénario A (Priorité 1) : Meilleur scénario (haute probabilité)
+- Scénario B (Priorité 2) : Alternative (moyenne probabilité)
+- Scénario C (Priorité 3) : Conservative (basse probabilité mais safe)
+- Scénario D (Priorité 4) : Opposé / Contre-tendance
+
+CHAQUE SCÉNARIO CONTIENT OBLIGATOIREMENT :
+
+- id          : "A", "B", "C", "D"
+- type        : "BUY_LIMIT" | "SELL_LIMIT" | "BUY_NOW" | "SELL_NOW"
+- zone_label  : description claire ("OB haussier H1", "Support majeur", etc.)
+- zone_price  : plage exacte ("5780 - 5790")
+- entry       : PRIX NUMÉRIQUE EXACT (ex: 5785.50)
+- sl          : PRIX NUMÉRIQUE EXACT (ex: 5650.00)
+- tp1         : PRIX NUMÉRIQUE EXACT (ex: 5900.00)
+- tp2         : PRIX NUMÉRIQUE EXACT (ex: 6000.00)
+- tp3         : PRIX NUMÉRIQUE EXACT (ex: 6150.00)
+- rr          : RATIO NUMÉRIQUE (ex: 1.67)
+- priority    : 1, 2, 3, 4
+
+❌ INTERDIT : null, "—", "" ou texte dans les champs numériques.
+✅ OBLIGATOIRE : chaque entry/sl/tp doit être un NOMBRE.
+
+============================================================
+NIVEAUX À RESPECTER
+============================================================
+
+BUY :
+SL < Entry < TP1 < TP2 < TP3
+
+SELL :
+TP3 < TP2 < TP1 < Entry < SL
+
+============================================================
+FORMAT JSON (aucun Markdown, aucun texte autour)
+============================================================
+
+{
+  "asset": "",
+  "market_type": "",
+  "strategy_applied": "MULTI_TF",
+  "timeframes_analyzed": ["M15", "H1", "H4"],
+  "tf_analysis": [
+    {
+      "image_index": 1,
+      "timeframe": "M15",
+      "bias": "BUY",
+      "structure": "",
+      "key_zone": ""
+    }
+  ],
+  "confluence_status": "ALIGNED|PARTIAL|DISAGREEMENT|NEUTRAL",
+  "signal": "BUY LIMIT",
+  "direction": "BUY",
+  "confidence_percent": 75,
+  "entry": 5785.50,
+  "sl": 5650.00,
+  "tp1": 5900.00,
+  "tp2": 6000.00,
+  "tp3": 6150.00,
+  "rr": 1.67,
+  "arkas_score": 75,
+  "structure": "",
+  "reason": "",
+  "primary_scenario": "",
+  "alternative_scenario": "",
+  "invalidation": "",
+  "zones": [
+    {
+      "id": "A",
+      "type": "BUY_LIMIT",
+      "zone_label": "OB haussier M15",
+      "zone_price": "5780 - 5790",
+      "entry": 5785.50,
+      "sl": 5650.00,
+      "tp1": 5900.00,
+      "tp2": 6000.00,
+      "tp3": 6150.00,
+      "rr": 1.67,
+      "priority": 1
+    },
+    {
+      "id": "B",
+      "type": "BUY_LIMIT",
+      "zone_label": "Support majeur H1",
+      "zone_price": "5700 - 5720",
+      "entry": 5710.00,
+      "sl": 5600.00,
+      "tp1": 5850.00,
+      "tp2": 5950.00,
+      "tp3": 6100.00,
+      "rr": 1.50,
+      "priority": 2
+    },
+    {
+      "id": "C",
+      "type": "BUY_LIMIT",
+      "zone_label": "Retest trendline",
+      "zone_price": "5750 - 5760",
+      "entry": 5755.00,
+      "sl": 5650.00,
+      "tp1": 5850.00,
+      "tp2": 5950.00,
+      "tp3": 6050.00,
+      "rr": 1.30,
+      "priority": 3
+    },
+    {
+      "id": "D",
+      "type": "SELL_LIMIT",
+      "zone_label": "Résistance H4",
+      "zone_price": "6000 - 6020",
+      "entry": 6010.00,
+      "sl": 6080.00,
+      "tp1": 5900.00,
+      "tp2": 5800.00,
+      "tp3": 5700.00,
+      "rr": 1.60,
+      "priority": 4
+    }
+  ],
+  "risk_management": {
+    "risk_percent": "1%",
+    "recommendation": ""
+  },
+  "economic_news": "Non disponible — vérifier le calendrier.",
+  "risk_warning": ""
+}
+
+============================================================
+RAPPEL FINAL
+============================================================
+
+1. DÉTECTE le timeframe de chaque image.
+2. FOURNIS 4 scénarios avec niveaux CHIFFRÉS.
+3. Adapte les prix à l'actif (Volatility 75, XAUUSD, EURUSD...).
+4. Si l'actif a des prix comme 5780, utilise ces valeurs.
+5. RÉPONDS UNIQUEMENT EN JSON VALIDE.`;
+}
+
+
+/* ============================================================
    PROMPT AUDIT
    ============================================================ */
 
@@ -207,65 +405,6 @@ Réponds UNIQUEMENT avec ce JSON :
 }
 
 Prompt utilisateur : ${userPrompt}`;
-}
-
-
-/* ============================================================
-   PROMPT MULTI-TIMEFRAME
-   ============================================================ */
-
-function buildMultiTFPrompt(images) {
-    const count = images.length;
-
-    return `Tu es ARKAS SCAN AI, expert en analyse multi-timeframe.
-
-Tu reçois ${count} capture(s) SANS indication de timeframe.
-
-ÉTAPE 1 — DÉTECTE le timeframe de CHAQUE image :
-M1, M5, M15, M30, H1, H4, D1, W1.
-Si impossible → "UNKNOWN".
-
-ÉTAPE 2 — ANALYSE chaque timeframe :
-- Biais (BUY/SELL/NEUTRAL)
-- Structure (BOS, CHoCH, OB, FVG)
-- Zones clés
-
-ÉTAPE 3 — CONFLUENCE :
-- ALIGNED / PARTIAL / DISAGREEMENT / NEUTRAL
-
-ÉTAPE 4 — SIGNAL :
-- BUY NOW / SELL NOW / BUY LIMIT / SELL LIMIT / WAIT
-
-Réponds UNIQUEMENT avec ce JSON :
-{
-  "asset": "",
-  "market_type": "",
-  "strategy_applied": "MULTI_TF",
-  "timeframes_analyzed": [],
-  "tf_analysis": [
-    { "image_index": 1, "timeframe": "H4", "bias": "BUY", "structure": "", "key_zone": "" }
-  ],
-  "confluence_status": "ALIGNED|PARTIAL|DISAGREEMENT|NEUTRAL",
-  "signal": "",
-  "direction": "",
-  "confidence_percent": 0,
-  "entry": null,
-  "sl": null,
-  "tp1": null,
-  "tp2": null,
-  "tp3": null,
-  "rr": null,
-  "arkas_score": 0,
-  "structure": "",
-  "reason": "",
-  "primary_scenario": "",
-  "alternative_scenario": "",
-  "invalidation": "",
-  "zones": [],
-  "risk_management": { "risk_percent": "1%", "recommendation": "" },
-  "economic_news": "",
-  "risk_warning": ""
-}`;
 }
 
 

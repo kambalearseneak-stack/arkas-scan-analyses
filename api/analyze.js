@@ -807,3 +807,4 @@ function safeGeminiError(text) {
         return "Erreur Gemini.";
     }
 }
+

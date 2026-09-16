@@ -1743,8 +1743,9 @@ footer {
 ::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #3b4a63; }
 
+
 /* =========================================================
-   32. MULTI-TIMEFRAME UPLOAD
+   32. MULTI-TIMEFRAME PREVIEW
    ========================================================= */
 
 .tf-slot {
@@ -1789,59 +1790,19 @@ footer {
   box-shadow: 0 0 0 3px var(--color-primary-glow);
 }
 
-.tf-drop {
-  border: 2px dashed var(--color-primary);
-  border-radius: var(--radius-sm);
-  padding: 1.5rem 1rem;
-  text-align: center;
-  cursor: pointer;
-  transition: all var(--transition);
-  outline: none;
-}
-
-.tf-drop:hover,
-.tf-drop:focus-visible {
-  background: rgba(0, 230, 118, 0.06);
-}
-
-.tf-drop.drag-over {
-  background: rgba(0, 230, 118, 0.14);
-  transform: scale(1.01);
-}
-
-.tf-drop.hidden { display: none; }
-
-.tf-drop-icon {
-  font-size: 2rem;
-  margin-bottom: 0.5rem;
-}
-
-.tf-drop p {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  margin-bottom: 0.25rem;
-}
-
-.tf-drop small {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-}
-
 .tf-preview {
   position: relative;
   border-radius: var(--radius-sm);
   overflow: hidden;
   border: 1px solid var(--border-input);
+  background: var(--bg-input);
 }
-
-.tf-preview.hidden { display: none; }
 
 .tf-preview img {
   display: block;
   width: 100%;
   max-height: 200px;
   object-fit: contain;
-  background: var(--bg-input);
 }
 
 .tf-remove-btn {

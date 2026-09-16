@@ -6,38 +6,48 @@
 (function () {
     "use strict";
 
-    /* =========================================================
-       CONFIGURATION DERIV (SANS TOKEN, PUBLIC)
-       ========================================================= */
-
     const DERIV_APP_ID = 1089;
-    const DERIV_WS_URL = `wss://ws.derivws.com/websockets/v3?app_id=${DERIV_APP_ID}&l=FR`;
+    const DERIV_WS_URL = `wss://derivws.com/websockets/v3?app_id=${DERIV_APP_ID}&l=FR`;
 
     /* =========================================================
-       MAPPING DES SYMBOLES
+       MAPPING DES SYMBOLES (avec alias)
        ========================================================= */
 
     const SYMBOL_MAP = {
+        // OR
         "XAUUSD": "frxXAUUSD",
         "GOLD": "frxXAUUSD",
-        "EURUSD": "frxEURUSD",
-        "GBPUSD": "frxGBPUSD",
-        "USDJPY": "frxUSDJPY",
-        "USDCHF": "frxUSDCHF",
-        "AUDUSD": "frxAUDUSD",
-        "USDCAD": "frxUSDCAD",
-        "NZDUSD": "frxNZDUSD",
-        "EURJPY": "frxEURJPY",
-        "GBPJPY": "frxGBPJPY",
-        "BTCUSD": "cryBTCUSD",
-        "BTCUSDT": "cryBTCUSD",
-        "ETHUSD": "cryETHUSD",
-        "ETHUSDT": "cryETHUSD",
-        "R_10": "R_10",
-        "R_25": "R_25",
-        "R_50": "R_50",
-        "R_75": "R_75",
-        "R_100": "R_100"
+
+        // FOREX
+        "EURUSD": "frxEURUSD", "GBPUSD": "frxGBPUSD",
+        "USDJPY": "frxUSDJPY", "USDCHF": "frxUSDCHF",
+        "AUDUSD": "frxAUDUSD", "USDCAD": "frxUSDCAD",
+        "NZDUSD": "frxNZDUSD", "EURJPY": "frxEURJPY",
+        "GBPJPY": "frxGBPJPY", "EURGBP": "frxEURGBP",
+        "EURCHF": "frxEURCHF", "AUDJPY": "frxAUDJPY",
+        "CADJPY": "frxCADJPY", "CHFJPY": "frxCHFJPY",
+
+        // CRYPTO
+        "BTCUSD": "cryBTCUSD", "BTCUSDT": "cryBTCUSD", "BITCOIN": "cryBTCUSD",
+        "ETHUSD": "cryETHUSD", "ETHUSDT": "cryETHUSD", "ETHEREUM": "cryETHUSD",
+        "LTCUSD": "cryLTCUSD", "LTCUSDT": "cryLTCUSD",
+
+        // VOLATILITY
+        "R_10": "R_10", "R_25": "R_25", "R_50": "R_50", "R_75": "R_75", "R_100": "R_100",
+        "VOLATILITY 10": "R_10", "VOLATILITY 10 INDEX": "R_10",
+        "VOLATILITY 25": "R_25", "VOLATILITY 25 INDEX": "R_25",
+        "VOLATILITY 50": "R_50", "VOLATILITY 50 INDEX": "R_50",
+        "VOLATILITY 75": "R_75", "VOLATILITY 75 INDEX": "R_75",
+        "VOLATILITY 100": "R_100", "VOLATILITY 100 INDEX": "R_100",
+
+        // BOOM / CRASH
+        "BOOM 500": "BOOM500", "BOOM 1000": "BOOM1000",
+        "CRASH 500": "CRASH500", "CRASH 1000": "CRASH1000",
+
+        // STEP / JUMP
+        "STEP INDEX": "stpRNG", "STEP": "stpRNG",
+        "JUMP 10": "JD10", "JUMP 25": "JD25",
+        "JUMP 50": "JD50", "JUMP 75": "JD75", "JUMP 100": "JD100"
     };
 
     /* =========================================================
@@ -46,8 +56,8 @@
 
     let socket = null;
     let isConnected = false;
-    let activeSubscriptions = {}; // { symbol: subscriptionId }
-    let monitoredTrades = {};     // { tradeId: trade }
+    let activeSubscriptions = {};
+    let monitoredTrades = {};
     let reconnectTimer = null;
 
     /* =========================================================
@@ -82,29 +92,17 @@
         socket.onopen = () => {
             console.log("🟢 Simulator connecté à Deriv");
             isConnected = true;
-
-            // Re-souscrire aux symboles actifs
-            Object.keys(activeSubscriptions).forEach(symbol => {
-                subscribeToSymbol(symbol);
-            });
+            Object.keys(activeSubscriptions).forEach(symbol => subscribeToSymbol(symbol));
         };
 
         socket.onmessage = (event) => {
             let data;
             try { data = JSON.parse(event.data); } catch { return; }
-
-            if (data.msg_type === "tick" && data.tick) {
-                handleTick(data.tick);
-            }
-
-            if (data.error) {
-                console.warn("⚠️ Deriv error:", data.error);
-            }
+            if (data.msg_type === "tick" && data.tick) handleTick(data.tick);
+            if (data.error) console.warn("⚠️ Deriv error:", data.error);
         };
 
-        socket.onerror = () => {
-            console.warn("⚠️ Simulator WebSocket error");
-        };
+        socket.onerror = () => console.warn("⚠️ Simulator WebSocket error");
 
         socket.onclose = () => {
             console.log("🔌 Simulator déconnecté");
@@ -122,55 +120,29 @@
     }
 
     /* =========================================================
-       SOUSCRIPTION À UN SYMBOLE
+       SOUSCRIPTION
        ========================================================= */
 
     function subscribeToSymbol(symbol) {
-
-        if (!isConnected || !socket || socket.readyState !== WebSocket.OPEN) {
-            return;
-        }
-
-        if (activeSubscriptions[symbol]) {
-            return; // Déjà abonné
-        }
+        if (!isConnected || !socket || socket.readyState !== WebSocket.OPEN) return;
+        if (activeSubscriptions[symbol]) return;
 
         try {
-            socket.send(JSON.stringify({
-                ticks: symbol,
-                subscribe: 1
-            }));
+            socket.send(JSON.stringify({ ticks: symbol, subscribe: 1 }));
             activeSubscriptions[symbol] = true;
             console.log("📡 Abonné à", symbol);
-        } catch (e) {
-            console.error("Erreur souscription:", e);
-        }
-    }
-
-    function unsubscribeFromSymbol(symbol) {
-
-        if (!isConnected || !socket || socket.readyState !== WebSocket.OPEN) {
-            return;
-        }
-
-        try {
-            socket.send(JSON.stringify({ forget_all: "ticks" }));
-            delete activeSubscriptions[symbol];
-        } catch (e) {}
+        } catch (e) { console.error(e); }
     }
 
     /* =========================================================
-       TRAITEMENT D'UN TICK
+       TRAITEMENT TICK
        ========================================================= */
 
     function handleTick(tick) {
-
         const symbol = tick.symbol;
         const price = parseFloat(tick.quote);
-
         if (isNaN(price)) return;
 
-        // Vérifier tous les trades pour ce symbole
         Object.values(monitoredTrades).forEach(trade => {
             if (trade.derivSymbol === symbol && trade.status === "PENDING") {
                 checkTrade(trade, price);
@@ -178,37 +150,22 @@
         });
     }
 
-    /* =========================================================
-       VÉRIFICATION D'UN TRADE
-       ========================================================= */
-
     function checkTrade(trade, currentPrice) {
-
         const { direction, entry, sl, tp1 } = trade;
-
         let result = null;
 
         if (direction === "BUY") {
-            if (currentPrice <= sl) {
-                result = "LOSS";
-            } else if (currentPrice >= tp1) {
-                result = "WIN";
-            }
+            if (currentPrice <= sl) result = "LOSS";
+            else if (currentPrice >= tp1) result = "WIN";
         } else if (direction === "SELL") {
-            if (currentPrice >= sl) {
-                result = "LOSS";
-            } else if (currentPrice <= tp1) {
-                result = "WIN";
-            }
+            if (currentPrice >= sl) result = "LOSS";
+            else if (currentPrice <= tp1) result = "WIN";
         }
 
-        if (result) {
-            updateTradeResult(trade.id, result, currentPrice);
-        }
+        if (result) updateTradeResult(trade.id, result, currentPrice);
     }
 
     function updateTradeResult(tradeId, result, closePrice) {
-
         const trade = monitoredTrades[tradeId];
         if (!trade) return;
 
@@ -217,25 +174,19 @@
         trade.closedAt = new Date().toISOString();
 
         console.log(`🎯 Trade ${tradeId} → ${result} @ ${closePrice}`);
-
-        // Mise à jour localStorage
         saveTrades();
-
-        // Notification UI
         notifyResult(trade);
     }
 
     /* =========================================================
-       GESTION DES TRADES
+       GESTION TRADES
        ========================================================= */
 
     function loadTrades() {
-
         try {
             const stored = localStorage.getItem("arkas_monitored_trades");
             monitoredTrades = stored ? JSON.parse(stored) : {};
 
-            // Ré-abonner aux symboles nécessaires
             const symbolsToWatch = new Set();
             Object.values(monitoredTrades).forEach(t => {
                 if (t.status === "PENDING" && t.derivSymbol) {
@@ -248,9 +199,7 @@
             });
 
             console.log(`📂 ${Object.keys(monitoredTrades).length} trade(s) chargé(s)`);
-
         } catch (e) {
-            console.warn("Erreur chargement trades:", e);
             monitoredTrades = {};
         }
     }
@@ -262,71 +211,63 @@
     }
 
     /* =========================================================
-       API PUBLIQUE (appelée depuis dashboard.js)
+       API PUBLIQUE
        ========================================================= */
 
     window.ARKAS_SIMULATOR = {
 
-        /**
-         * Ajoute un trade à surveiller
-         */
         addTrade: function (data) {
 
             const asset = (data.asset || "").toUpperCase().trim();
 
-            // Vérifier si le symbole est disponible
-            const derivSymbol = SYMBOL_MAP[asset];
+            // Recherche intelligente
+            let derivSymbol = SYMBOL_MAP[asset];
+
+            if (!derivSymbol) {
+                const keys = Object.keys(SYMBOL_MAP);
+                const match = keys.find(k => asset.includes(k) || k.includes(asset));
+                if (match) derivSymbol = SYMBOL_MAP[match];
+            }
+
+            // Alias Volatility
+            if (!derivSymbol && asset.includes("VOLATILITY")) {
+                const num = asset.match(/\d+/);
+                if (num && num[0]) {
+                    const rKey = `R_${num[0]}`;
+                    if (SYMBOL_MAP[rKey]) derivSymbol = SYMBOL_MAP[rKey];
+                }
+            }
 
             if (!derivSymbol) {
                 return {
                     success: false,
-                    message: `⚠️ Simulation non disponible pour "${asset}".\n\nSymboles supportés : XAUUSD, EURUSD, GBPUSD, USDJPY, BTCUSD, ETHUSD, R_10, R_25, R_50, R_75, R_100...`
+                    message: `⚠️ Simulation non disponible pour "${asset}".\n\nSymboles supportés : XAUUSD, EURUSD, GBPUSD, USDJPY, BTCUSD, ETHUSD, R_10, R_25, R_50, R_75, R_100, VOLATILITY 75...`
                 };
             }
 
-            // Validation des niveaux
             const { signal, direction, entry, sl, tp1 } = data;
 
-            if (!entry || !sl) {
+            if (!entry || !sl || !tp1) {
                 return {
                     success: false,
-                    message: "❌ Entry et SL obligatoires pour la simulation."
+                    message: "❌ Entry, SL et TP1 sont obligatoires pour simuler."
                 };
             }
 
-            if (!tp1) {
-                return {
-                    success: false,
-                    message: "❌ Au moins TP1 est nécessaire pour la simulation."
-                };
-            }
-
-            // Déterminer la direction
             let dir = (direction || "").toUpperCase();
             if (!dir || dir === "UNKNOWN") {
                 if (signal && signal.includes("BUY")) dir = "BUY";
                 else if (signal && signal.includes("SELL")) dir = "SELL";
                 else {
-                    return {
-                        success: false,
-                        message: "❌ Signal BUY ou SELL requis pour simuler."
-                    };
+                    return { success: false, message: "❌ Signal BUY ou SELL requis." };
                 }
             }
 
-            // Validation sens
             if (dir === "BUY" && sl >= entry) {
-                return {
-                    success: false,
-                    message: "❌ BUY : SL doit être < Entry."
-                };
+                return { success: false, message: "❌ BUY : SL doit être < Entry." };
             }
-
             if (dir === "SELL" && sl <= entry) {
-                return {
-                    success: false,
-                    message: "❌ SELL : SL doit être > Entry."
-                };
+                return { success: false, message: "❌ SELL : SL doit être > Entry." };
             }
 
             const tradeId = "TRD_" + Date.now();
@@ -348,8 +289,6 @@
             };
 
             saveTrades();
-
-            // S'abonner au symbole
             subscribeToSymbol(derivSymbol);
 
             console.log(`➕ Trade ajouté : ${tradeId} (${asset} → ${derivSymbol})`);
@@ -357,22 +296,16 @@
             return {
                 success: true,
                 tradeId: tradeId,
-                message: `✅ Trade ajouté à la simulation.\nSuivi de ${asset} en temps réel.`
+                message: `✅ Trade ajouté !\nSuivi de ${asset} en temps réel.`
             };
         },
 
-        /**
-         * Retourne tous les trades
-         */
         getTrades: function () {
             return Object.values(monitoredTrades).sort(
                 (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
             );
         },
 
-        /**
-         * Supprime un trade
-         */
         deleteTrade: function (tradeId) {
             if (monitoredTrades[tradeId]) {
                 delete monitoredTrades[tradeId];
@@ -382,19 +315,13 @@
             return false;
         },
 
-        /**
-         * Retourne les statistiques
-         */
         getStats: function () {
             const trades = Object.values(monitoredTrades);
             const total = trades.length;
             const wins = trades.filter(t => t.status === "WIN").length;
             const losses = trades.filter(t => t.status === "LOSS").length;
             const pending = trades.filter(t => t.status === "PENDING").length;
-            const winRate = (wins + losses) > 0
-                ? Math.round((wins / (wins + losses)) * 100)
-                : 0;
-
+            const winRate = (wins + losses) > 0 ? Math.round((wins / (wins + losses)) * 100) : 0;
             return { total, wins, losses, pending, winRate };
         }
     };
@@ -404,13 +331,8 @@
        ========================================================= */
 
     function notifyResult(trade) {
+        window.dispatchEvent(new CustomEvent("arkas:trade-result", { detail: trade }));
 
-        // Déclencher un événement custom
-        window.dispatchEvent(new CustomEvent("arkas:trade-result", {
-            detail: trade
-        }));
-
-        // Notification native si autorisée
         if ("Notification" in window && Notification.permission === "granted") {
             const emoji = trade.status === "WIN" ? "🎉" : "😢";
             new Notification(`${emoji} Trade ${trade.status}`, {
@@ -425,7 +347,6 @@
 
     function startPeriodicCheck() {
         setInterval(() => {
-            // Re-vérifier les trades en cours
             const trades = Object.values(monitoredTrades);
             trades.forEach(t => {
                 if (t.status === "PENDING" && t.derivSymbol) {

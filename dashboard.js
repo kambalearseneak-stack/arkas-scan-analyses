@@ -1,5 +1,6 @@
 /* =========================================================
    ARKAS SCAN AI V2 — DASHBOARD MULTI-TIMEFRAME
+   Upload multiple + Attribution timeframe + Analyse
    ========================================================= */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -8,13 +9,22 @@ document.addEventListener("DOMContentLoaded", () => {
     const MAX_SIZE = 10 * 1024 * 1024;
 
     let slots = {
-        1: { base64: null, mimeType: null, fileName: null, timeframe: null },
-        2: { base64: null, mimeType: null, fileName: null, timeframe: null },
-        3: { base64: null, mimeType: null, fileName: null, timeframe: null }
+        1: { base64: null, mimeType: null },
+        2: { base64: null, mimeType: null },
+        3: { base64: null, mimeType: null }
     };
 
     let isProcessing = false;
 
+    /* =========================================================
+       RÉFÉRENCES DOM
+       ========================================================= */
+
+    const fileInput = document.getElementById("chart-files");
+    const importBtn = document.getElementById("import-btn");
+    const dropZone = document.getElementById("dropZone");
+    const previewContainer = document.getElementById("preview-container");
+    const scannerActions = document.getElementById("scanner-actions");
     const analyzeBtn = document.getElementById("analyze-btn");
     const resetBtn = document.getElementById("reset-btn");
     const analysisStatus = document.getElementById("analysis-status");
@@ -23,50 +33,55 @@ document.addEventListener("DOMContentLoaded", () => {
     const globalLoader = document.getElementById("global-loader");
 
     /* =========================================================
-       SETUP SLOTS
+       IMPORT
        ========================================================= */
 
-    for (let i = 1; i <= MAX_IMAGES; i++) setupSlot(i);
-
-    function setupSlot(n) {
-
-        const dropEl = document.getElementById(`tf-drop-${n}`);
-        const inputEl = document.getElementById(`tf-file-${n}`);
-        const selectEl = document.getElementById(`tf-select-${n}`);
-        const removeBtn = document.querySelector(`.tf-remove-btn[data-slot="${n}"]`);
-
-        selectEl.addEventListener("change", () => {
-            slots[n].timeframe = selectEl.value;
-            updateAnalyzeButton();
-        });
-
-        dropEl.addEventListener("click", () => {
-            if (!isProcessing) inputEl.click();
-        });
-
-        dropEl.addEventListener("dragover", (e) => {
+    if (importBtn) {
+        importBtn.addEventListener("click", (e) => {
             e.preventDefault();
-            dropEl.classList.add("drag-over");
-        });
-
-        dropEl.addEventListener("dragleave", () => {
-            dropEl.classList.remove("drag-over");
-        });
-
-        dropEl.addEventListener("drop", (e) => {
-            e.preventDefault();
-            dropEl.classList.remove("drag-over");
-            if (isProcessing) return;
-            if (e.dataTransfer.files.length) handleFile(n, e.dataTransfer.files[0]);
-        });
-
-        inputEl.addEventListener("change", () => {
-            if (inputEl.files.length) handleFile(n, inputEl.files[0]);
-        });
-
-        removeBtn.addEventListener("click", (e) => {
             e.stopPropagation();
-            resetSlot(n);
+            if (!isProcessing) fileInput.click();
+        });
+    }
+
+    if (dropZone) {
+
+        dropZone.addEventListener("click", (e) => {
+            if (e.target.closest("button")) return;
+            if (!isProcessing) fileInput.click();
+        });
+
+        dropZone.addEventListener("keydown", (e) => {
+            if ((e.key === "Enter" || e.key === " ") && !isProcessing) {
+                e.preventDefault();
+                fileInput.click();
+            }
+        });
+
+        dropZone.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            dropZone.classList.add("drag-over");
+        });
+
+        dropZone.addEventListener("dragleave", () => {
+            dropZone.classList.remove("drag-over");
+        });
+
+        dropZone.addEventListener("drop", (e) => {
+            e.preventDefault();
+            dropZone.classList.remove("drag-over");
+            if (isProcessing) return;
+
+            const files = Array.from(e.dataTransfer.files).slice(0, MAX_IMAGES);
+            if (files.length) handleFiles(files);
+        });
+    }
+
+    if (fileInput) {
+        fileInput.addEventListener("change", () => {
+            if (!fileInput.files || !fileInput.files.length) return;
+            const files = Array.from(fileInput.files).slice(0, MAX_IMAGES);
+            handleFiles(files);
         });
     }
 
@@ -81,16 +96,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
             img.onload = () => {
                 URL.revokeObjectURL(url);
+
                 let { width, height } = img;
                 if (width > maxWidth) {
                     height = Math.round((height * maxWidth) / width);
                     width = maxWidth;
                 }
+
                 const canvas = document.createElement("canvas");
                 canvas.width = width;
                 canvas.height = height;
+
                 const ctx = canvas.getContext("2d");
                 ctx.drawImage(img, 0, 0, width, height);
+
                 canvas.toBlob(
                     (blob) => blob ? resolve(blob) : reject(new Error("Compression échouée")),
                     "image/jpeg",
@@ -98,92 +117,153 @@ document.addEventListener("DOMContentLoaded", () => {
                 );
             };
 
-            img.onerror = () => reject(new Error("Lecture image échouée"));
+            img.onerror = () => reject(new Error("Lecture échouée"));
             img.src = url;
         });
     }
 
     /* =========================================================
-       TRAITEMENT FICHIER
+       TRAITEMENT DES FICHIERS
        ========================================================= */
 
-    async function handleFile(n, file) {
+    async function handleFiles(files) {
 
         const allowed = ["image/jpeg", "image/png", "image/webp"];
 
-        if (!allowed.includes(file.type)) {
-            showStatus(`❌ Image ${n} : format non supporté.`, "error");
-            return;
+        // Reset
+        for (let i = 1; i <= MAX_IMAGES; i++) {
+            slots[i] = { base64: null, mimeType: null };
         }
 
-        if (file.size > MAX_SIZE) {
-            showStatus(`❌ Image ${n} : trop lourde.`, "error");
-            return;
+        showStatus(`📷 Traitement de ${files.length} image(s)…`, "info");
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const slotN = i + 1;
+
+            if (!allowed.includes(file.type)) {
+                showStatus(`❌ Image ${slotN} : format non supporté.`, "error");
+                continue;
+            }
+
+            if (file.size > MAX_SIZE) {
+                showStatus(`❌ Image ${slotN} : trop lourde (max 10 MB).`, "error");
+                continue;
+            }
+
+            try {
+                const compressed = await compressImage(file);
+                const base64 = await blobToDataURL(compressed);
+
+                slots[slotN].base64 = base64;
+                slots[slotN].mimeType = "image/jpeg";
+
+            } catch (err) {
+                console.error(err);
+                showStatus(`❌ Erreur image ${slotN}.`, "error");
+            }
         }
 
-        showStatus(`📷 Compression image ${n}…`, "info");
+        renderPreviews();
+        updateAnalyzeButton();
+    }
 
-        try {
-            const compressed = await compressImage(file);
+    function blobToDataURL(blob) {
+        return new Promise((resolve, reject) => {
             const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    }
 
-            reader.onload = (event) => {
+    /* =========================================================
+       AFFICHAGE DES APERÇUS
+       ========================================================= */
 
-                slots[n].base64 = event.target.result;
-                slots[n].mimeType = "image/jpeg";
-                slots[n].fileName = file.name;
+    function renderPreviews() {
 
-                document.getElementById(`tf-img-${n}`).src = event.target.result;
-                document.getElementById(`tf-preview-${n}`).classList.remove("hidden");
-                document.getElementById(`tf-drop-${n}`).classList.add("hidden");
+        let hasAny = false;
 
-                updateAnalyzeButton();
-                showStatus(`✅ Image ${n} importée.`, "success");
-            };
+        for (let i = 1; i <= MAX_IMAGES; i++) {
 
-            reader.readAsDataURL(compressed);
+            const slotEl = document.querySelector(`.tf-slot[data-slot="${i}"]`);
+            const imgEl = document.getElementById(`tf-img-${i}`);
 
-        } catch (err) {
-            console.error(err);
-            showStatus(`❌ Erreur image ${n}.`, "error");
+            if (slots[i].base64) {
+                imgEl.src = slots[i].base64;
+                slotEl.style.display = "block";
+                hasAny = true;
+            } else {
+                imgEl.src = "";
+                slotEl.style.display = "none";
+            }
+        }
+
+        if (hasAny) {
+            previewContainer.style.display = "block";
+            dropZone.style.display = "none";
+            scannerActions.style.display = "flex";
+        } else {
+            previewContainer.style.display = "none";
+            dropZone.style.display = "block";
+            scannerActions.style.display = "none";
         }
     }
 
     /* =========================================================
-       RESET SLOT
+       TIMEFRAME
        ========================================================= */
 
-    function resetSlot(n) {
+    for (let i = 1; i <= MAX_IMAGES; i++) {
+        const selectEl = document.getElementById(`tf-select-${i}`);
+        if (selectEl) {
+            selectEl.addEventListener("change", updateAnalyzeButton);
+        }
+    }
 
-        slots[n] = {
-            base64: null,
-            mimeType: null,
-            fileName: null,
-            timeframe: document.getElementById(`tf-select-${n}`).value || null
-        };
+    /* =========================================================
+       RETIRER UNE IMAGE
+       ========================================================= */
 
-        document.getElementById(`tf-preview-${n}`).classList.add("hidden");
-        document.getElementById(`tf-drop-${n}`).classList.remove("hidden");
-        document.getElementById(`tf-file-${n}`).value = "";
-        document.getElementById(`tf-img-${n}`).src = "";
+    document.querySelectorAll(".tf-remove-btn").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const slotN = Number(btn.dataset.slot);
+            if (slotN) removeSlot(slotN);
+        });
+    });
 
+    function removeSlot(n) {
+
+        slots[n] = { base64: null, mimeType: null };
+
+        const selectEl = document.getElementById(`tf-select-${n}`);
+        if (selectEl) selectEl.value = "";
+
+        renderPreviews();
         updateAnalyzeButton();
     }
 
     /* =========================================================
-       RESET GLOBAL
+       RÉINITIALISER
        ========================================================= */
 
     if (resetBtn) {
         resetBtn.addEventListener("click", () => {
+
             for (let i = 1; i <= MAX_IMAGES; i++) {
-                resetSlot(i);
-                document.getElementById(`tf-select-${i}`).value = "";
-                slots[i].timeframe = null;
+                slots[i] = { base64: null, mimeType: null };
+                const selectEl = document.getElementById(`tf-select-${i}`);
+                if (selectEl) selectEl.value = "";
             }
+
+            if (fileInput) fileInput.value = "";
+
             resultsSection.classList.add("hidden");
-            showStatus("🔄 Réinitialisé.", "info");
+            renderPreviews();
             updateAnalyzeButton();
+            showStatus("🔄 Réinitialisé.", "info");
         });
     }
 
@@ -193,16 +273,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function updateAnalyzeButton() {
 
-        const filled = Object.values(slots).filter(s => s.base64);
-        const allHaveTF = filled.every(s => s.timeframe);
-        const can = filled.length >= 1 && allHaveTF && !isProcessing;
+        const filled = [];
 
+        for (let i = 1; i <= MAX_IMAGES; i++) {
+            if (!slots[i].base64) continue;
+            const tf = document.getElementById(`tf-select-${i}`)?.value;
+            if (tf) filled.push({ slot: i, tf });
+        }
+
+        const totalFilled = Object.values(slots).filter(s => s.base64).length;
+
+        const can = filled.length >= 1 && !isProcessing;
         analyzeBtn.disabled = !can;
 
-        if (filled.length === 0) {
-            showStatus("Importe au moins 1 capture avec son timeframe.", "info");
-        } else if (!allHaveTF) {
-            showStatus("⚠️ Sélectionne un timeframe pour chaque image.", "info");
+        if (totalFilled === 0) {
+            showStatus("Importe au moins 1 capture.", "info");
+        } else if (filled.length < totalFilled) {
+            showStatus("⚠️ Donne un timeframe à chaque image.", "info");
         } else {
             showStatus(`✅ ${filled.length} image(s) prête(s).`, "success");
         }
@@ -224,17 +311,20 @@ document.addEventListener("DOMContentLoaded", () => {
         const images = [];
 
         for (let i = 1; i <= MAX_IMAGES; i++) {
-            if (slots[i].base64 && slots[i].timeframe) {
-                const clean = slots[i].base64.includes(",")
-                    ? slots[i].base64.split(",")[1]
-                    : slots[i].base64;
+            if (!slots[i].base64) continue;
 
-                images.push({
-                    timeframe: slots[i].timeframe,
-                    imageBase64: clean,
-                    mimeType: slots[i].mimeType || "image/jpeg"
-                });
-            }
+            const tf = document.getElementById(`tf-select-${i}`)?.value;
+            if (!tf) continue;
+
+            const clean = slots[i].base64.includes(",")
+                ? slots[i].base64.split(",")[1]
+                : slots[i].base64;
+
+            images.push({
+                timeframe: tf,
+                imageBase64: clean,
+                mimeType: slots[i].mimeType || "image/jpeg"
+            });
         }
 
         if (!images.length) {
@@ -554,6 +644,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function setButtonsDisabled(d) {
         if (analyzeBtn) analyzeBtn.disabled = d;
         if (resetBtn) resetBtn.disabled = d;
+        if (importBtn) importBtn.disabled = d;
     }
 
     function showStatus(msg, type = "info") {
@@ -596,6 +687,11 @@ document.addEventListener("DOMContentLoaded", () => {
             .replace(/'/g, "&#039;");
     }
 
+    /* =========================================================
+       INITIALISATION
+       ========================================================= */
+
+    renderPreviews();
     updateAnalyzeButton();
     renderHistory();
 

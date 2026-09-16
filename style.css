@@ -2214,3 +2214,37 @@ footer {
 .sim-line span {
   color: var(--text-secondary);
 }
+
+/* =========================================================
+   36. BOUTONS PAR SIGNAL
+   ========================================================= */
+
+.main-signal-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin: 1rem 0;
+  flex-wrap: wrap;
+}
+
+.main-signal-actions button {
+  flex: 1;
+  min-width: 140px;
+}
+
+.zone-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+}
+
+.zone-actions .zone-btn {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+.zone-card {
+  display: flex;
+  flex-direction: column;
+}

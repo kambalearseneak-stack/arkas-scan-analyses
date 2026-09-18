@@ -1,6 +1,6 @@
 // ============================================================
 // ARKAS SCAN AI V2
-// API GEMINI - V2.2 (Multi-TF + Scénarios + Sécurité)
+// API GEMINI - V2.3 (Détection libre du timeframe)
 // ============================================================
 
 export default async function handler(req, res) {
@@ -159,7 +159,7 @@ export default async function handler(req, res) {
            MODÈLE + ENDPOINT
            ==================================================== */
 
-        const model = "gemini-2.5-flash";
+        const model = "gemini-3.6-flash";
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
         /* ====================================================
@@ -352,7 +352,7 @@ export default async function handler(req, res) {
         }
 
         /* ====================================================
-           RÉPONSE FINALE (format compatible dashboard)
+           RÉPONSE FINALE
            ==================================================== */
 
         return res.status(200).json({
@@ -363,11 +363,14 @@ export default async function handler(req, res) {
             timeframe: timeframe,
             market_type: marketType,
 
-            /* Format standard */
+            /* Signal standard */
             signal: result.signal,
+            action: result.signal,
             direction: result.direction,
             confidence_percent: result.confidence_percent,
             arkas_score: result.arkas_score,
+
+            /* Niveaux */
             entry: result.entry,
             sl: result.sl,
             tp1: result.tp1,
@@ -375,7 +378,7 @@ export default async function handler(req, res) {
             tp3: result.tp3,
             rr: result.rr,
 
-            /* Analyse */
+            /* Analyse technique */
             structure: result.structure,
             trend: result.trend,
             liquidity: result.liquidity,
@@ -398,8 +401,7 @@ export default async function handler(req, res) {
             /* Multi-scénarios */
             zones: result.zones,
 
-            /* Alias */
-            action: result.signal,
+            /* Divers */
             strategy_applied: result.strategy_applied,
             risk_management: result.risk_management || {},
             economic_news: result.economic_news || "Non disponible",
@@ -420,13 +422,17 @@ export default async function handler(req, res) {
 
 
 /* ============================================================
-   PROMPT PRINCIPAL
+   PROMPT PRINCIPAL — DÉTECTION LIBRE DU TIMEFRAME
    ============================================================ */
 
 function buildPrompt({ mode, asset, timeframe, marketType, userPrompt, imageCount }) {
 
     const isMultiTF = (mode === "multi-tf" || mode === "multitf" || (imageCount > 1 && mode !== "audit"));
     const isAudit = (mode === "audit");
+
+    /* ====================================================
+       PROMPT DE BASE
+       ==================================================== */
 
     const base = `
 Tu es ARKAS SCAN AI V2, un assistant spécialisé en analyse technique.
@@ -440,14 +446,60 @@ Nombre de captures : ${imageCount}
 RÈGLES ABSOLUES
 ============================================================
 
-1. Analyse UNIQUEMENT ce qui est visible.
+1. Analyse UNIQUEMENT ce qui est visible sur les captures.
 2. Ne fabrique JAMAIS un prix absent de la capture.
 3. Si l'échelle de prix n'est pas lisible → WAIT.
 4. Pour BUY : SL < Entry < TP1 < TP2 < TP3
 5. Pour SELL : TP3 < TP2 < TP1 < Entry < SL
 6. Si TP2/TP3 incertains → null.
 7. N'invente JAMAIS d'actualités économiques.
-8. Une capture = un graphique (Forex, Gold, Crypto, Indices, Synthétiques).
+8. Chaque capture est un graphique DIFFÉRENT avec son PROPRE timeframe.
+
+============================================================
+DÉTECTION AUTOMATIQUE DU TIMEFRAME (CRITIQUE)
+============================================================
+
+⚠️ Tu NE DOIS PAS supposer un timeframe.
+⚠️ Tu DOIS LIRE le timeframe sur CHAQUE capture.
+
+Pour CHAQUE image, examine attentivement :
+
+1. L'échelle de temps affichée (haut/bas du graphique)
+   Ex: "1m", "5m", "15m", "1h", "4h", "1D", "1W"
+
+2. La taille et l'espacement des bougies :
+   - S15 à M5   → bougies très serrées, beaucoup de bruit
+   - M15 à M30  → bougies moyennes, intraday
+   - H1 à H4    → bougies larges, swing
+   - D1 / W1    → bougies très larges, long terme
+
+3. Les indicateurs visibles (RSI, MACD, MA)
+   → Leurs périodes donnent des indices
+
+4. Le nombre de bougies visibles
+   → Beaucoup + serrées = petit TF
+   → Peu + larges = grand TF
+
+5. Le nombre de décimales des prix
+   → Plus de décimales = petit TF
+
+6. Les patterns (marteau, doji, engulfing)
+
+7. Le volume si affiché
+
+TIMEFRAMES POSSIBLES :
+- Secondes : S15, S30
+- Minutes  : M1, M2, M3, M5, M10, M15, M30
+- Heures   : H1, H2, H4, H6, H8, H12
+- Jours    : D1
+- Semaines : W1
+- Mois     : MN1
+
+Si tu ne peux PAS déterminer avec certitude :
+→ retourne "UNKNOWN" pour cette image.
+
+⚠️ N'INVENTE JAMAIS un timeframe.
+⚠️ Ne suppose pas H1 ou H4 par défaut.
 
 ============================================================
 ANALYSE TECHNIQUE
@@ -467,63 +519,115 @@ Observe lorsque visible :
 SIGNAL
 ============================================================
 
-Choisis UNE action parmi :
 BUY NOW | SELL NOW | BUY LIMIT | SELL LIMIT | WAIT
 
-- BUY NOW / SELL NOW : entrée immédiate claire
-- BUY LIMIT / SELL LIMIT : attente retour sur zone
+- BUY NOW / SELL NOW : entrée immédiate
+- BUY LIMIT / SELL LIMIT : attente retour zone
 - WAIT : pas de configuration claire
-
-Si configuration intéressante mais entrée non confirmée → préfère LIMIT.
 `;
+
+    /* ====================================================
+       MODE MULTI-TIMEFRAME
+       ==================================================== */
 
     let modeInstructions = "";
 
-    /* ---- MULTI-TIMEFRAME ---- */
     if (isMultiTF) {
         modeInstructions = `
 
 ============================================================
-MODE MULTI-TIMEFRAME
+MODE MULTI-TIMEFRAME — DÉTECTION LIBRE
 ============================================================
 
 Tu reçois ${imageCount} capture(s) de timeframes DIFFÉRENTS.
+Tu dois DÉTECTER toi-même le timeframe de CHAQUE image.
 
-ÉTAPE 1 — DÉTECTE le timeframe de CHAQUE image :
-M1, M5, M15, M30, H1, H4, D1, W1.
-Si impossible → "UNKNOWN".
+⚠️ Les timeframes peuvent être N'IMPORTE LESQUELS :
+- Peut être H4 + H1 + M15
+- Peut être D1 + H4 + H1
+- Peut être M30 + M15 + M5
+- Peut être W1 + D1 + H4
+- Peut être des TF exotiques (M2, H2, H6, etc.)
+- Peut même avoir 2 TF identiques
 
-ÉTAPE 2 — ANALYSE chaque timeframe :
+→ Tu DOIS lire chaque capture indépendamment.
+
+============================================================
+ÉTAPE 1 — DÉTECTION DU TIMEFRAME
+============================================================
+
+Pour CHAQUE image :
+1. Observe l'échelle temporelle si visible
+2. Analyse la taille des bougies
+3. Compte les bougies visibles
+4. Regarde les indicateurs
+5. Déduis le timeframe
+
+Retourne dans "tf_analysis" un objet par image avec :
+- image_index : 1, 2, 3...
+- timeframe : "M5", "H1", "D1", "W1", etc. ou "UNKNOWN"
+- confidence : "haute", "moyenne", "basse"
+- bias : BUY / SELL / NEUTRAL
+- structure : description
+- key_zone : zone clé
+
+⚠️ Si tu n'es pas sûr → "UNKNOWN"
+⚠️ Ne force PAS un timeframe standard.
+
+============================================================
+ÉTAPE 2 — TRI HIÉRARCHIQUE
+============================================================
+
+Une fois les timeframes détectés :
+
+1. Identifie le TF le PLUS GRAND (contexte)
+2. Le TF MOYEN (structure)
+3. Le TF le PLUS PETIT (entrée)
+
+Si 2 ou 3 TF → adapte l'analyse à leur ordre réel.
+Si 1 seul TF → analyse simple.
+
+============================================================
+ÉTAPE 3 — ANALYSE PAR TIMEFRAME
+============================================================
+
+Pour chaque TF détecté :
 - Biais (BUY / SELL / NEUTRAL)
 - Structure (BOS, CHoCH, OB, FVG)
 - Zones clés
 
-ÉTAPE 3 — VÉRIFIE LA CONFLUENCE :
-- ALIGNED      → tous alignés
-- PARTIAL      → 2 sur 3 alignés
+============================================================
+ÉTAPE 4 — CONFLUENCE
+============================================================
+
+- ALIGNED      → tous les TF alignés
+- PARTIAL      → majorité alignés
 - DISAGREEMENT → désaccord
 - NEUTRAL      → aucun biais
 
-ÉTAPE 4 — SIGNAL PRINCIPAL :
-- BUY NOW / SELL NOW → confluence totale
-- BUY LIMIT / SELL LIMIT → attente retour zone
-- WAIT → désaccord total
+============================================================
+ÉTAPE 5 — SIGNAL PRINCIPAL
+============================================================
 
-ÉTAPE 5 — SCÉNARIOS MULTIPLES (OBLIGATOIRE) :
-Fournis exactement 4 scénarios A, B, C, D avec :
-- id : "A", "B", "C", "D"
-- type : "BUY_LIMIT" | "SELL_LIMIT" | "BUY_NOW" | "SELL_NOW"
-- zone_label : description
-- zone_price : plage exacte ("5780 - 5790")
-- entry, sl, tp1, tp2, tp3 : NOMBRES EXACTS
-- rr : ratio
-- priority : 1 à 4
+- Confluence totale → BUY NOW / SELL NOW
+- Confluence partielle → BUY LIMIT / SELL LIMIT
+- Désaccord → WAIT
 
-⚠️ CHAQUE scénario DOIT avoir des niveaux CHIFFRÉS (pas de null).
+============================================================
+ÉTAPE 6 — SCÉNARIOS MULTIPLES
+============================================================
+
+Fournis 4 scénarios (A, B, C, D) avec niveaux CHIFFRÉS.
+
+⚠️ NE MÉLANGE PAS les prix entre les timeframes.
+⚠️ Chaque scénario utilise les prix d'UN timeframe.
 `;
     }
 
-    /* ---- AUDIT ---- */
+    /* ====================================================
+       MODE AUDIT
+       ==================================================== */
+
     else if (isAudit) {
         modeInstructions = `
 
@@ -532,23 +636,21 @@ MODE AUDIT
 ============================================================
 
 Analyse la capture contenant une analyse utilisateur.
-Vérifie-la indépendamment :
-- Direction, Entry, SL, TP
+Détecte d'abord le timeframe.
+Vérifie indépendamment :
+- Direction
+- Entry, SL, TP
 - Structure, invalidation
-- Cohérence du risque
 
-Statue : VALIDATED / CORRECT / PREMATURE / INVALID / UNCLEAR
-
-Fournis :
-- verdict
-- strengths (points positifs)
-- errors (erreurs)
-- corrections (améliorations)
-- corrected_trade : signal, entry, sl, tp1, tp2, tp3, rr, validation_probability
+Statue : VALIDATED / CORRECT / PREMATURE / INVALID / UNCLEAR.
+Fournis les corrections chiffrées.
 `;
     }
 
-    /* ---- SCAN SIMPLE ---- */
+    /* ====================================================
+       MODE SCAN
+       ==================================================== */
+
     else {
         modeInstructions = `
 
@@ -556,22 +658,18 @@ Fournis :
 MODE SCAN
 ============================================================
 
-Analyse complète et concise.
-
-Fournis :
-- action
-- direction
-- entry, sl, tp1, tp2, tp3, rr
-- confidence_percent
-- arkas_score
-- reason
-- invalidation
-
-Fournis aussi 2 à 4 scénarios alternatifs (zones).
+Détecte d'abord le timeframe de la capture.
+Puis analyse complètement :
+signal, direction, entry, sl, tp1, tp2, tp3, rr,
+confidence_percent, arkas_score, reason, invalidation,
+et 2 à 4 scénarios alternatifs.
 `;
     }
 
-    /* ---- INSTRUCTION UTILISATEUR ---- */
+    /* ====================================================
+       PROMPT UTILISATEUR
+       ==================================================== */
+
     const extra = userPrompt ? `
 
 ============================================================
@@ -581,7 +679,10 @@ INSTRUCTION UTILISATEUR
 ${userPrompt}
 ` : "";
 
-    /* ---- SCHÉMA JSON ATTENDU ---- */
+    /* ====================================================
+       SCHÉMA JSON
+       ==================================================== */
+
     const schema = `
 
 ============================================================
@@ -600,7 +701,7 @@ FORMAT JSON ATTENDU (aucun Markdown)
   "rr": 0,
   "confidence_percent": 0,
   "arkas_score": 0,
-  "strategy_applied": "MULTI_TF|SMC|SMC_PA_HYBRID|PRICE_ACTION|AUDIT",
+  "strategy_applied": "MULTI_TF|SMC|PRICE_ACTION|AUDIT",
   "structure": "",
   "trend": "",
   "liquidity": "",
@@ -610,17 +711,18 @@ FORMAT JSON ATTENDU (aucun Markdown)
   "fvg": "",
   "support": "",
   "resistance": "",
+  "reason": "",
+  "invalidation": "",
   "primary_scenario": "",
   "alternative_scenario": "",
-  "invalidation": "",
-  "reason": "",
   "confluence_status": "ALIGNED|PARTIAL|DISAGREEMENT|NEUTRAL",
   "timeframes_analyzed": [],
   "tf_analysis": [
     {
       "image_index": 1,
       "timeframe": "H4",
-      "bias": "BUY|SELL|NEUTRAL",
+      "confidence": "haute",
+      "bias": "BUY",
       "structure": "",
       "key_zone": ""
     }
@@ -628,7 +730,7 @@ FORMAT JSON ATTENDU (aucun Markdown)
   "zones": [
     {
       "id": "A",
-      "type": "BUY_LIMIT|SELL_LIMIT|BUY_NOW|SELL_NOW",
+      "type": "BUY_LIMIT",
       "zone_label": "",
       "zone_price": "",
       "entry": 0,
@@ -648,9 +750,14 @@ FORMAT JSON ATTENDU (aucun Markdown)
   "risk_warning": ""
 }
 
-Si WAIT, mets les niveaux à null.
-
-Réponds UNIQUEMENT avec ce JSON.
+RÈGLES FINALES :
+1. DÉTECTE le timeframe de CHAQUE image séparément.
+2. Ne suppose jamais H1 ou H4 par défaut.
+3. Si tu n'es pas sûr → "UNKNOWN".
+4. "tf_analysis" DOIT contenir ${imageCount} élément(s).
+5. "timeframes_analyzed" = liste des TF réellement détectés.
+6. Les niveaux doivent être NUMÉRIQUES.
+7. Réponds UNIQUEMENT avec ce JSON.
 `;
 
     return base + modeInstructions + extra + schema;

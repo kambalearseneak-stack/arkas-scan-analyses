@@ -1,37 +1,21 @@
 // ============================================================
 // ARKAS SCAN AI V2
-// API GEMINI - V2.1
+// API GEMINI - V2.2 (Multi-TF + Scénarios + Sécurité)
 // ============================================================
 
 export default async function handler(req, res) {
 
-    // ========================================================
-    // CORS
-    // ========================================================
+    /* ========================================================
+       CORS
+       ======================================================== */
 
-    res.setHeader(
-        "Access-Control-Allow-Origin",
-        "*"
-    );
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
-    res.setHeader(
-        "Access-Control-Allow-Methods",
-        "POST, OPTIONS"
-    );
+    if (req.method === "OPTIONS") return res.status(200).end();
 
-    res.setHeader(
-        "Access-Control-Allow-Headers",
-        "Content-Type, Authorization"
-    );
-
-    // Préflight
-    if (req.method === "OPTIONS") {
-        return res.status(200).end();
-    }
-
-    // Seulement POST
     if (req.method !== "POST") {
-
         return res.status(405).json({
             success: false,
             error: "METHOD_NOT_ALLOWED",
@@ -41,1076 +25,573 @@ export default async function handler(req, res) {
 
     try {
 
-        // ====================================================
-        // API KEY
-        // ====================================================
+        /* ====================================================
+           API KEY
+           ==================================================== */
 
-        const apiKey =
-            process.env.GEMINI_API_KEY;
+        const apiKey = process.env.GEMINI_API_KEY;
 
         if (!apiKey) {
-
-            console.error(
-                "❌ GEMINI_API_KEY absente"
-            );
-
+            console.error("❌ GEMINI_API_KEY absente");
             return res.status(500).json({
                 success: false,
                 error: "GEMINI_KEY_MISSING",
-                message:
-                    "La clé GEMINI_API_KEY n'est pas configurée sur Vercel."
+                message: "La clé GEMINI_API_KEY n'est pas configurée."
             });
         }
 
-        // ====================================================
-        // BODY
-        // ====================================================
+        /* ====================================================
+           BODY
+           ==================================================== */
 
-        const body =
-            req.body || {};
+        const body = req.body || {};
+        const mode = String(body.mode || "scan").toLowerCase().trim();
+        const asset = String(body.asset || "UNKNOWN").trim();
+        const timeframe = String(body.timeframe || "UNKNOWN").trim();
+        const userPrompt = String(body.prompt || "").trim();
 
-        const mode =
-            String(
-                body.mode || "scan"
-            )
-            .toLowerCase()
-            .trim();
-
-        const asset =
-            String(
-                body.asset || "UNKNOWN"
-            )
-            .trim();
-
-        const timeframe =
-            String(
-                body.timeframe || "UNKNOWN"
-            )
-            .trim();
-
-        const userPrompt =
-            String(
-                body.prompt || ""
-            )
-            .trim();
-
-        // ====================================================
-        // RÉCUPÉRATION DES IMAGES
-        // ====================================================
+        /* ====================================================
+           RÉCUPÉRATION DES IMAGES
+           ==================================================== */
 
         let images = [];
 
-        // Format recommandé :
-        // images: [{ imageBase64, mimeType }]
-
         if (Array.isArray(body.images)) {
-
-            images =
-                body.images
-                    .filter(item =>
-                        item &&
-                        item.imageBase64
-                    )
-                    .map(item => ({
-                        imageBase64:
-                            cleanBase64(
-                                item.imageBase64
-                            ),
-
-                        mimeType:
-                            normalizeMimeType(
-                                item.mimeType
-                            )
-                    }));
+            images = body.images
+                .filter(item => item && item.imageBase64)
+                .map(item => ({
+                    imageBase64: cleanBase64(item.imageBase64),
+                    mimeType: normalizeMimeType(item.mimeType)
+                }));
         }
 
-        // Compatibilité ancien frontend
-        if (
-            images.length === 0 &&
-            body.imageBase64
-        ) {
-
-            images = [
-                {
-                    imageBase64:
-                        cleanBase64(
-                            body.imageBase64
-                        ),
-
-                    mimeType:
-                        normalizeMimeType(
-                            body.mimeType
-                        )
-                }
-            ];
+        if (images.length === 0 && body.imageBase64) {
+            images = [{
+                imageBase64: cleanBase64(body.imageBase64),
+                mimeType: normalizeMimeType(body.mimeType)
+            }];
         }
 
-        // ====================================================
-        // VALIDATION IMAGES
-        // ====================================================
+        /* ====================================================
+           VALIDATION IMAGES
+           ==================================================== */
 
         if (images.length === 0) {
-
             return res.status(400).json({
                 success: false,
                 error: "IMAGE_MISSING",
-                message:
-                    "Aucune capture graphique n'a été reçue."
+                message: "Aucune capture graphique reçue."
             });
         }
 
         if (images.length > 6) {
-
             return res.status(400).json({
                 success: false,
                 error: "TOO_MANY_IMAGES",
-                message:
-                    "Maximum 6 captures par analyse."
+                message: "Maximum 6 captures par analyse."
             });
         }
 
-        // ====================================================
-        // VALIDATION MIME
-        // ====================================================
-
-        const allowedMimeTypes = [
-            "image/jpeg",
-            "image/png",
-            "image/webp"
-        ];
+        const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
 
         for (const image of images) {
-
-            if (
-                !allowedMimeTypes.includes(
-                    image.mimeType
-                )
-            ) {
-
+            if (!allowedMimeTypes.includes(image.mimeType)) {
                 return res.status(400).json({
                     success: false,
                     error: "INVALID_IMAGE_TYPE",
-                    message:
-                        `Format non supporté : ${image.mimeType}. ` +
-                        "Utilise JPG, PNG ou WebP."
+                    message: `Format non supporté : ${image.mimeType}. Utilise JPG, PNG ou WebP.`
                 });
             }
-
-            if (
-                !image.imageBase64 ||
-                image.imageBase64.length < 100
-            ) {
-
+            if (!image.imageBase64 || image.imageBase64.length < 100) {
                 return res.status(400).json({
                     success: false,
                     error: "INVALID_IMAGE",
-                    message:
-                        "Une des captures reçues est vide ou invalide."
+                    message: "Une capture est vide ou invalide."
                 });
             }
         }
 
-        // ====================================================
-        // LIMITE TOTALE
-        // Gemini accepte les images inline de taille limitée.
-        // On garde une marge de sécurité pour la requête.
-        // ====================================================
+        const totalBase64Size = images.reduce((total, img) => total + img.imageBase64.length, 0);
 
-        const totalBase64Size =
-            images.reduce(
-                (total, image) =>
-                    total +
-                    image.imageBase64.length,
-                0
-            );
-
-        if (
-            totalBase64Size >
-            18_000_000
-        ) {
-
+        if (totalBase64Size > 18_000_000) {
             return res.status(413).json({
                 success: false,
                 error: "IMAGE_TOO_LARGE",
-                message:
-                    "Les captures sont trop volumineuses. " +
-                    "Réduis leur résolution ou leur taille."
+                message: "Captures trop volumineuses. Réduis leur taille."
             });
         }
 
-        // ====================================================
-        // CLASSIFICATION ACTIF
-        // ====================================================
+        /* ====================================================
+           CLASSIFICATION
+           ==================================================== */
 
-        const marketType =
-            classifyMarket(
-                asset
-            );
+        const marketType = classifyMarket(asset);
 
-        // ====================================================
-        // PROMPT
-        // ====================================================
+        /* ====================================================
+           PROMPT
+           ==================================================== */
 
-        const prompt =
-            buildPrompt({
-                mode,
-                asset,
-                timeframe,
-                marketType,
-                userPrompt,
-                imageCount:
-                    images.length
-            });
-
-        // ====================================================
-        // CONSTRUCTION PARTS GEMINI
-        // ====================================================
-
-        const parts = [];
-
-        // Texte d'abord
-        parts.push({
-            text: prompt
+        const prompt = buildPrompt({
+            mode,
+            asset,
+            timeframe,
+            marketType,
+            userPrompt,
+            imageCount: images.length
         });
 
-        // Images
-        for (
-            const image of images
-        ) {
+        /* ====================================================
+           PARTS GEMINI
+           ==================================================== */
 
+        const parts = [{ text: prompt }];
+
+        for (const image of images) {
             parts.push({
                 inlineData: {
-                    mimeType:
-                        image.mimeType,
-
-                    data:
-                        image.imageBase64
+                    mimeType: image.mimeType,
+                    data: image.imageBase64
                 }
             });
         }
 
-        // ====================================================
-        // MODÈLE
-        // ====================================================
+        /* ====================================================
+           MODÈLE + ENDPOINT
+           ==================================================== */
 
-        const model =
-            "gemini-3.6-flash";
+        const model = "gemini-3.6-flash";
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
-        const endpoint =
-            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+        /* ====================================================
+           REQUÊTE GEMINI
+           ==================================================== */
 
-        // ====================================================
-        // REQUÊTE GEMINI
-        // ====================================================
-
-        const controller =
-            new AbortController();
-
-        const timeout =
-            setTimeout(
-                () => controller.abort(),
-                55_000
-            );
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 55_000);
 
         let geminiResponse;
 
         try {
-
-            geminiResponse =
-                await fetch(
-                    endpoint,
-                    {
-                        method: "POST",
-
-                        headers: {
-                            "Content-Type":
-                                "application/json",
-
-                            "x-goog-api-key":
-                                apiKey
-                        },
-
-                        body:
-                            JSON.stringify({
-
-                                contents: [
-                                    {
-                                        role: "user",
-
-                                        parts:
-                                            parts
-                                    }
-                                ],
-
-                                generationConfig: {
-
-                                    responseMimeType:
-                                        "application/json",
-
-                                    responseSchema:
-                                        buildResponseSchema(),
-
-                                    maxOutputTokens:
-                                        4000
-                                },
-
-                                safetySettings: [
-                                    {
-                                        category:
-                                            "HARM_CATEGORY_HARASSMENT",
-
-                                        threshold:
-                                            "BLOCK_ONLY_HIGH"
-                                    },
-
-                                    {
-                                        category:
-                                            "HARM_CATEGORY_HATE_SPEECH",
-
-                                        threshold:
-                                            "BLOCK_ONLY_HIGH"
-                                    },
-
-                                    {
-                                        category:
-                                            "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-
-                                        threshold:
-                                            "BLOCK_ONLY_HIGH"
-                                    },
-
-                                    {
-                                        category:
-                                            "HARM_CATEGORY_DANGEROUS_CONTENT",
-
-                                        threshold:
-                                            "BLOCK_ONLY_HIGH"
-                                    }
-                                ]
-                            }),
-
-                        signal:
-                            controller.signal
-                    }
-                );
+            geminiResponse = await fetch(endpoint, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-goog-api-key": apiKey
+                },
+                body: JSON.stringify({
+                    contents: [{
+                        role: "user",
+                        parts: parts
+                    }],
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        maxOutputTokens: 8000
+                    },
+                    safetySettings: [
+                        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+                        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
+                        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
+                        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" }
+                    ]
+                }),
+                signal: controller.signal
+            });
 
         } catch (error) {
-
-            clearTimeout(
-                timeout
-            );
-
-            if (
-                error &&
-                error.name === "AbortError"
-            ) {
-
+            clearTimeout(timeout);
+            if (error && error.name === "AbortError") {
                 return res.status(504).json({
                     success: false,
                     error: "GEMINI_TIMEOUT",
-                    message:
-                        "Gemini met trop longtemps à répondre. Réessaie."
+                    message: "Gemini met trop de temps à répondre. Réessaie."
                 });
             }
-
-            console.error(
-                "❌ GEMINI FETCH ERROR:",
-                error
-            );
-
+            console.error("❌ GEMINI FETCH ERROR:", error);
             return res.status(502).json({
                 success: false,
                 error: "GEMINI_CONNECTION_ERROR",
-                message:
-                    "Impossible de contacter Gemini.",
-                details:
-                    error?.message ||
-                    "Erreur réseau"
+                message: "Impossible de contacter Gemini.",
+                details: error?.message || "Erreur réseau"
             });
         }
 
-        clearTimeout(
-            timeout
-        );
+        clearTimeout(timeout);
 
-        // ====================================================
-        // LECTURE RÉPONSE
-        // ====================================================
+        /* ====================================================
+           LECTURE RÉPONSE
+           ==================================================== */
 
-        const rawText =
-            await geminiResponse.text();
-
+        const rawText = await geminiResponse.text();
         let geminiData = null;
 
         try {
-
-            geminiData =
-                JSON.parse(
-                    rawText
-                );
-
+            geminiData = JSON.parse(rawText);
         } catch (error) {
-
-            console.error(
-                "❌ GEMINI INVALID JSON:",
-                rawText
-            );
-
+            console.error("❌ GEMINI INVALID JSON:", rawText);
             return res.status(502).json({
                 success: false,
                 error: "GEMINI_INVALID_RESPONSE",
-                message:
-                    "Gemini a retourné une réponse illisible.",
-                httpStatus:
-                    geminiResponse.status
+                message: "Gemini a retourné une réponse illisible.",
+                httpStatus: geminiResponse.status
             });
         }
 
-        // ====================================================
-        // ERREUR HTTP GEMINI
-        // ====================================================
+        /* ====================================================
+           ERREUR HTTP GEMINI
+           ==================================================== */
 
         if (!geminiResponse.ok) {
-
-            console.error(
-                "❌ GEMINI HTTP ERROR:",
-                geminiResponse.status,
-                JSON.stringify(
-                    geminiData
-                )
-            );
-
-            return handleGeminiHttpError(
-                res,
-                geminiResponse.status,
-                geminiData
-            );
+            console.error("❌ GEMINI HTTP ERROR:", geminiResponse.status, JSON.stringify(geminiData));
+            return handleGeminiHttpError(res, geminiResponse.status, geminiData);
         }
 
-        // ====================================================
-        // PROMPT BLOQUÉ
-        // ====================================================
+        /* ====================================================
+           PROMPT BLOQUÉ
+           ==================================================== */
 
-        if (
-            geminiData.promptFeedback &&
-            geminiData.promptFeedback.blockReason
-        ) {
-
-            const reason =
-                geminiData
-                    .promptFeedback
-                    .blockReason;
-
-            const ratings =
-                geminiData
-                    .promptFeedback
-                    .safetyRatings ||
-                [];
-
-            console.warn(
-                "⚠️ GEMINI PROMPT BLOCKED:",
-                reason
-            );
-
+        if (geminiData.promptFeedback && geminiData.promptFeedback.blockReason) {
+            const reason = geminiData.promptFeedback.blockReason;
+            console.warn("⚠️ GEMINI PROMPT BLOCKED:", reason);
             return res.status(400).json({
-
                 success: false,
-
-                error:
-                    "GEMINI_PROMPT_BLOCKED",
-
-                message:
-                    "Gemini a bloqué cette demande.",
-
-                reason:
-                    reason,
-
-                safetyRatings:
-                    ratings,
-
-                userMessage:
-                    buildFriendlyBlockMessage(
-                        reason
-                    )
+                error: "GEMINI_PROMPT_BLOCKED",
+                message: "Gemini a bloqué cette demande.",
+                reason: reason,
+                userMessage: buildFriendlyBlockMessage(reason)
             });
         }
 
-        // ====================================================
-        // CANDIDATS
-        // ====================================================
+        /* ====================================================
+           CANDIDATS
+           ==================================================== */
 
-        const candidates =
-            Array.isArray(
-                geminiData.candidates
-            )
-                ? geminiData.candidates
-                : [];
+        const candidates = Array.isArray(geminiData.candidates) ? geminiData.candidates : [];
 
-        if (
-            candidates.length === 0
-        ) {
-
-            console.warn(
-                "⚠️ GEMINI SANS CANDIDAT:",
-                JSON.stringify(
-                    geminiData
-                )
-            );
-
+        if (candidates.length === 0) {
+            console.warn("⚠️ GEMINI SANS CANDIDAT:", JSON.stringify(geminiData));
             return res.status(400).json({
-
                 success: false,
-
-                error:
-                    "GEMINI_NO_CANDIDATE",
-
-                message:
-                    "Gemini n'a retourné aucune analyse exploitable.",
-
-                feedback:
-                    geminiData.promptFeedback ||
-                    null
+                error: "GEMINI_NO_CANDIDATE",
+                message: "Gemini n'a retourné aucune analyse exploitable."
             });
         }
 
-        const candidate =
-            candidates[0];
+        const candidate = candidates[0];
+        const finishReason = candidate.finishReason || null;
 
-        // ====================================================
-        // FINISH REASON
-        // ====================================================
-
-        const finishReason =
-            candidate.finishReason ||
-            null;
-
-        if (
-            finishReason ===
-            "SAFETY"
-        ) {
-
+        if (finishReason === "SAFETY" || finishReason === "PROHIBITED_CONTENT" || finishReason === "BLOCKLIST" || finishReason === "SPII") {
             return res.status(400).json({
-
                 success: false,
-
-                error:
-                    "GEMINI_RESPONSE_BLOCKED",
-
-                message:
-                    "Gemini a bloqué la réponse générée.",
-
-                reason:
-                    finishReason,
-
-                safetyRatings:
-                    candidate.safetyRatings ||
-                    []
+                error: "GEMINI_RESPONSE_BLOCKED",
+                message: "Gemini a bloqué la réponse générée.",
+                reason: finishReason
             });
         }
 
-        if (
-            finishReason ===
-                "PROHIBITED_CONTENT" ||
-            finishReason ===
-                "BLOCKLIST" ||
-            finishReason ===
-                "SPII"
-        ) {
+        /* ====================================================
+           EXTRACTION TEXTE
+           ==================================================== */
 
-            return res.status(400).json({
-
-                success: false,
-
-                error:
-                    "GEMINI_CONTENT_BLOCKED",
-
-                message:
-                    "Gemini n'a pas pu générer cette réponse.",
-
-                reason:
-                    finishReason,
-
-                safetyRatings:
-                    candidate.safetyRatings ||
-                    []
-            });
-        }
-
-        // ====================================================
-        // EXTRACTION DU TEXTE
-        // ====================================================
-
-        const generatedText =
-            extractGeminiText(
-                candidate
-            );
+        const generatedText = extractGeminiText(candidate);
 
         if (!generatedText) {
-
-            console.warn(
-                "⚠️ GEMINI EMPTY TEXT:",
-                JSON.stringify(
-                    candidate
-                )
-            );
-
+            console.warn("⚠️ GEMINI EMPTY TEXT:", JSON.stringify(candidate));
             return res.status(400).json({
-
                 success: false,
-
-                error:
-                    "GEMINI_EMPTY_RESPONSE",
-
-                message:
-                    "Gemini a répondu sans contenu exploitable.",
-
-                finishReason:
-                    finishReason
+                error: "GEMINI_EMPTY_RESPONSE",
+                message: "Gemini a répondu sans contenu.",
+                finishReason: finishReason
             });
         }
 
-        // ====================================================
-        // PARSING JSON
-        // ====================================================
+        /* ====================================================
+           PARSING JSON
+           ==================================================== */
 
         let parsed;
 
         try {
-
-            parsed =
-                parseGeminiJSON(
-                    generatedText
-                );
-
+            parsed = parseGeminiJSON(generatedText);
         } catch (error) {
-
-            console.error(
-                "❌ JSON GEMINI IMPOSSIBLE:",
-                generatedText
-            );
-
+            console.error("❌ JSON GEMINI IMPOSSIBLE:", generatedText);
             return res.status(502).json({
-
                 success: false,
-
-                error:
-                    "INVALID_ANALYSIS_JSON",
-
-                message:
-                    "Gemini a répondu avec un format JSON invalide.",
-
-                raw:
-                    generatedText
+                error: "INVALID_ANALYSIS_JSON",
+                message: "Gemini a répondu avec un JSON invalide."
             });
         }
 
-        // ====================================================
-        // NORMALISATION
-        // ====================================================
+        /* ====================================================
+           NORMALISATION
+           ==================================================== */
 
-        const result =
-            normalizeResult(
-                parsed,
-                {
-                    asset,
-                    timeframe,
-                    marketType,
-                    mode
-                }
-            );
+        const result = normalizeResult(parsed, {
+            asset,
+            timeframe,
+            marketType,
+            mode
+        });
 
-        // ====================================================
-        // VALIDATION
-        // ====================================================
+        /* ====================================================
+           VALIDATION
+           ==================================================== */
 
-        const validation =
-            validateResult(
-                result
-            );
+        const validation = validateResult(result);
 
-        if (
-            !validation.valid
-        ) {
-
-            console.warn(
-                "⚠️ ANALYSE INVALIDE:",
-                validation.message,
-                result
-            );
-
-            /*
-             * On ne détruit pas toute la réponse.
-             * On transforme simplement en WAIT.
-             */
-
-            result.action =
-                "WAIT";
-
-            result.direction =
-                "WAIT";
-
-            result.entry =
-                null;
-
-            result.sl =
-                null;
-
-            result.tp1 =
-                null;
-
-            result.tp2 =
-                null;
-
-            result.tp3 =
-                null;
-
-            result.rr =
-                null;
-
-            result.invalidation =
-                validation.message;
+        if (!validation.valid) {
+            console.warn("⚠️ ANALYSE INVALIDE:", validation.message, result);
+            result.signal = "WAIT";
+            result.direction = "WAIT";
+            result.entry = null;
+            result.sl = null;
+            result.tp1 = null;
+            result.tp2 = null;
+            result.tp3 = null;
+            result.rr = null;
+            result.invalidation = validation.message;
         }
 
-        // ====================================================
-        // RÉPONSE FINALE
-        // ====================================================
+        /* ====================================================
+           RÉPONSE FINALE (format compatible dashboard)
+           ==================================================== */
 
         return res.status(200).json({
-
             success: true,
+            model: model,
+            mode: mode,
+            asset: asset,
+            timeframe: timeframe,
+            market_type: marketType,
 
-            model:
-                model,
+            /* Format standard */
+            signal: result.signal,
+            direction: result.direction,
+            confidence_percent: result.confidence_percent,
+            arkas_score: result.arkas_score,
+            entry: result.entry,
+            sl: result.sl,
+            tp1: result.tp1,
+            tp2: result.tp2,
+            tp3: result.tp3,
+            rr: result.rr,
 
-            mode:
-                mode,
+            /* Analyse */
+            structure: result.structure,
+            trend: result.trend,
+            liquidity: result.liquidity,
+            order_block: result.order_block,
+            fvg: result.fvg,
+            bos: result.bos,
+            choch: result.choch,
+            support: result.support,
+            resistance: result.resistance,
+            reason: result.reason,
+            invalidation: result.invalidation,
+            primary_scenario: result.primary_scenario,
+            alternative_scenario: result.alternative_scenario,
 
-            asset:
-                asset,
+            /* Multi-TF */
+            confluence_status: result.confluence_status,
+            timeframes_analyzed: result.timeframes_analyzed,
+            tf_analysis: result.tf_analysis,
 
-            timeframe:
-                timeframe,
+            /* Multi-scénarios */
+            zones: result.zones,
 
-            market_type:
-                marketType,
+            /* Alias */
+            action: result.signal,
+            strategy_applied: result.strategy_applied,
+            risk_management: result.risk_management || {},
+            economic_news: result.economic_news || "Non disponible",
 
-            analysis:
-                result,
-
-            raw_finish_reason:
-                finishReason
+            raw_finish_reason: finishReason
         });
 
     } catch (error) {
-
-        console.error(
-            "🔥 ARKAS API ERROR:",
-            error
-        );
-
+        console.error("🔥 ARKAS API ERROR:", error);
         return res.status(500).json({
-
             success: false,
-
-            error:
-                "SERVER_ERROR",
-
-            message:
-                "Une erreur interne est survenue.",
-
-            details:
-                error?.message ||
-                "Erreur inconnue"
+            error: "SERVER_ERROR",
+            message: "Une erreur interne est survenue.",
+            details: error?.message || "Erreur inconnue"
         });
     }
 }
 
 
-// ============================================================
-// PROMPT PRINCIPAL
-// ============================================================
+/* ============================================================
+   PROMPT PRINCIPAL
+   ============================================================ */
 
-function buildPrompt({
-    mode,
-    asset,
-    timeframe,
-    marketType,
-    userPrompt,
-    imageCount
-}) {
+function buildPrompt({ mode, asset, timeframe, marketType, userPrompt, imageCount }) {
+
+    const isMultiTF = (mode === "multi-tf" || mode === "multitf" || (imageCount > 1 && mode !== "audit"));
+    const isAudit = (mode === "audit");
 
     const base = `
+Tu es ARKAS SCAN AI V2, un assistant spécialisé en analyse technique.
 
-Tu es ARKAS SCAN AI V2, un assistant spécialisé
-dans l'analyse technique de graphiques financiers.
-
-Tu analyses une ou plusieurs captures de graphiques
-fournies par l'utilisateur.
-
-ACTIF :
-${asset}
-
-MARCHÉ :
-${marketType}
-
-TIMEFRAME FOURNI :
-${timeframe}
-
-NOMBRE DE CAPTURES :
-${imageCount}
+Actif : ${asset}
+Marché : ${marketType}
+Timeframe fourni : ${timeframe}
+Nombre de captures : ${imageCount}
 
 ============================================================
 RÈGLES ABSOLUES
 ============================================================
 
-1. Analyse UNIQUEMENT ce qui est réellement visible
-   sur les captures.
-
-2. Ne fabrique jamais un prix qui n'est pas visible.
-
-3. Ne devine pas une valeur numérique absente.
-
-4. Si l'échelle de prix n'est pas lisible :
-   utilise WAIT plutôt que d'inventer un niveau.
-
-5. Si le timeframe n'est pas visible :
-   retourne "UNKNOWN".
-
-6. Si les informations sont insuffisantes :
-   retourne WAIT.
-
-7. Les niveaux Entry, SL et TP doivent être cohérents
-   avec les prix visibles.
-
-8. Pour BUY :
-   SL < Entry < TP1 < TP2 < TP3
-
-9. Pour SELL :
-   TP3 < TP2 < TP1 < Entry < SL
-
-10. Si TP2 ou TP3 ne sont pas clairement déterminables,
-    retourne null.
-
-11. N'utilise pas de données de marché externes.
-
-12. N'affirme pas avoir consulté les actualités économiques
-    ou les prix en direct.
-
-13. Une capture peut être un graphique Forex, Gold,
-    Crypto ou autre actif.
+1. Analyse UNIQUEMENT ce qui est visible.
+2. Ne fabrique JAMAIS un prix absent de la capture.
+3. Si l'échelle de prix n'est pas lisible → WAIT.
+4. Pour BUY : SL < Entry < TP1 < TP2 < TP3
+5. Pour SELL : TP3 < TP2 < TP1 < Entry < SL
+6. Si TP2/TP3 incertains → null.
+7. N'invente JAMAIS d'actualités économiques.
+8. Une capture = un graphique (Forex, Gold, Crypto, Indices, Synthétiques).
 
 ============================================================
 ANALYSE TECHNIQUE
 ============================================================
 
 Observe lorsque visible :
-
-- tendance
-- structure du marché
-- HH
-- HL
-- LH
-- LL
-- BOS
-- CHoCH
-- liquidité
-- sweep
-- support
-- résistance
-- Order Block
-- Fair Value Gap
-- imbalance
-- rejet
-- breakout
-- retest
-- momentum
-- zones d'entrée
+- Tendance, structure de marché
+- HH, HL, LH, LL
+- BOS, CHoCH
+- Liquidité, sweep
+- Support, résistance
+- Order Block, FVG, imbalance
+- Rejet, breakout, retest, momentum
+- Zones d'entrée
 
 ============================================================
 SIGNAL
 ============================================================
 
-Tu dois choisir UNE seule action :
+Choisis UNE action parmi :
+BUY NOW | SELL NOW | BUY LIMIT | SELL LIMIT | WAIT
 
-BUY NOW
-SELL NOW
-BUY LIMIT
-SELL LIMIT
-WAIT
+- BUY NOW / SELL NOW : entrée immédiate claire
+- BUY LIMIT / SELL LIMIT : attente retour sur zone
+- WAIT : pas de configuration claire
 
-BUY NOW :
-une entrée immédiate est cohérente avec la structure visible.
-
-SELL NOW :
-une entrée immédiate à la vente est cohérente.
-
-BUY LIMIT :
-attendre un retour du prix vers un niveau d'achat.
-
-SELL LIMIT :
-attendre un retour du prix vers un niveau de vente.
-
-WAIT :
-aucune entrée suffisamment claire.
-
-============================================================
-IMPORTANT
-============================================================
-
-Si tu vois une configuration intéressante mais que
-l'entrée n'est pas encore confirmée, préfère :
-
-BUY LIMIT
-ou
-SELL LIMIT
-
-plutôt que BUY NOW ou SELL NOW.
-
-Si la configuration est contradictoire :
-WAIT.
-
-Si tu ne peux pas lire correctement les prix :
-WAIT.
-
-============================================================
-FORMAT
-============================================================
-
-Réponds uniquement avec le JSON demandé.
-
-Aucun markdown.
-Aucun texte avant le JSON.
-Aucun texte après le JSON.
+Si configuration intéressante mais entrée non confirmée → préfère LIMIT.
 `;
 
     let modeInstructions = "";
 
-    // ========================================================
-    // MODE SCAN
-    // ========================================================
-
-    if (mode === "scan") {
-
+    /* ---- MULTI-TIMEFRAME ---- */
+    if (isMultiTF) {
         modeInstructions = `
 
-Effectue une analyse complète mais concise.
+============================================================
+MODE MULTI-TIMEFRAME
+============================================================
 
-Donne :
+Tu reçois ${imageCount} capture(s) de timeframes DIFFÉRENTS.
 
+ÉTAPE 1 — DÉTECTE le timeframe de CHAQUE image :
+M1, M5, M15, M30, H1, H4, D1, W1.
+Si impossible → "UNKNOWN".
+
+ÉTAPE 2 — ANALYSE chaque timeframe :
+- Biais (BUY / SELL / NEUTRAL)
+- Structure (BOS, CHoCH, OB, FVG)
+- Zones clés
+
+ÉTAPE 3 — VÉRIFIE LA CONFLUENCE :
+- ALIGNED      → tous alignés
+- PARTIAL      → 2 sur 3 alignés
+- DISAGREEMENT → désaccord
+- NEUTRAL      → aucun biais
+
+ÉTAPE 4 — SIGNAL PRINCIPAL :
+- BUY NOW / SELL NOW → confluence totale
+- BUY LIMIT / SELL LIMIT → attente retour zone
+- WAIT → désaccord total
+
+ÉTAPE 5 — SCÉNARIOS MULTIPLES (OBLIGATOIRE) :
+Fournis exactement 4 scénarios A, B, C, D avec :
+- id : "A", "B", "C", "D"
+- type : "BUY_LIMIT" | "SELL_LIMIT" | "BUY_NOW" | "SELL_NOW"
+- zone_label : description
+- zone_price : plage exacte ("5780 - 5790")
+- entry, sl, tp1, tp2, tp3 : NOMBRES EXACTS
+- rr : ratio
+- priority : 1 à 4
+
+⚠️ CHAQUE scénario DOIT avoir des niveaux CHIFFRÉS (pas de null).
+`;
+    }
+
+    /* ---- AUDIT ---- */
+    else if (isAudit) {
+        modeInstructions = `
+
+============================================================
+MODE AUDIT
+============================================================
+
+Analyse la capture contenant une analyse utilisateur.
+Vérifie-la indépendamment :
+- Direction, Entry, SL, TP
+- Structure, invalidation
+- Cohérence du risque
+
+Statue : VALIDATED / CORRECT / PREMATURE / INVALID / UNCLEAR
+
+Fournis :
+- verdict
+- strengths (points positifs)
+- errors (erreurs)
+- corrections (améliorations)
+- corrected_trade : signal, entry, sl, tp1, tp2, tp3, rr, validation_probability
+`;
+    }
+
+    /* ---- SCAN SIMPLE ---- */
+    else {
+        modeInstructions = `
+
+============================================================
+MODE SCAN
+============================================================
+
+Analyse complète et concise.
+
+Fournis :
 - action
 - direction
-- entry
-- sl
-- tp1
-- tp2
-- tp3
-- rr
-- confiance
-- score ARKAS
-- résumé
+- entry, sl, tp1, tp2, tp3, rr
+- confidence_percent
+- arkas_score
+- reason
 - invalidation
 
-Le résultat final doit être immédiatement compréhensible
-par le dashboard.
+Fournis aussi 2 à 4 scénarios alternatifs (zones).
 `;
     }
 
-    // ========================================================
-    // MODE MULTI TIMEFRAME
-    // ========================================================
-
-    else if (
-        mode === "multi-tf" ||
-        mode === "multitf"
-    ) {
-
-        modeInstructions = `
-
-Plusieurs captures peuvent représenter plusieurs
-timeframes.
-
-Détermine le timeframe seulement lorsqu'il est lisible.
-
-Utilise les timeframes supérieurs pour le contexte
-et les timeframes inférieurs pour l'entrée.
-
-Cherche une confluence entre :
-
-- tendance
-- structure
-- liquidité
-- BOS
-- CHoCH
-- OB
-- FVG
-- support/résistance
-- price action
-
-Si les timeframes se contredisent fortement :
-WAIT.
-`;
-    }
-
-    // ========================================================
-    // MODE AUDIT
-    // ========================================================
-
-    else if (
-        mode === "audit"
-    ) {
-
-        modeInstructions = `
-
-Effectue un audit du setup visible.
-
-Vérifie :
-
-- direction
-- entrée
-- SL
-- TP
-- structure
-- invalidation
-- cohérence du risque
-
-Si le setup proposé est incorrect,
-indique précisément le problème.
-
-Ne crée pas de prix non visibles.
-`;
-    }
-
-    // ========================================================
-    // PROMPT UTILISATEUR
-    // ========================================================
-
-    let extra =
-        "";
-
-    if (userPrompt) {
-
-        extra = `
+    /* ---- INSTRUCTION UTILISATEUR ---- */
+    const extra = userPrompt ? `
 
 ============================================================
 INSTRUCTION UTILISATEUR
 ============================================================
 
 ${userPrompt}
+` : "";
 
-`;
-    }
+    /* ---- SCHÉMA JSON ATTENDU ---- */
+    const schema = `
 
-    // ========================================================
-    // JSON ATTENDU
-    // ========================================================
-
-    const schemaExample = `
-
-Le JSON doit respecter cette structure :
+============================================================
+FORMAT JSON ATTENDU (aucun Markdown)
+============================================================
 
 {
-  "action": "BUY NOW",
-  "direction": "BUY",
+  "signal": "BUY NOW|SELL NOW|BUY LIMIT|SELL LIMIT|WAIT",
+  "action": "BUY NOW|SELL NOW|BUY LIMIT|SELL LIMIT|WAIT",
+  "direction": "BUY|SELL|WAIT",
   "entry": 0,
   "sl": 0,
   "tp1": 0,
@@ -1119,7 +600,8 @@ Le JSON doit respecter cette structure :
   "rr": 0,
   "confidence_percent": 0,
   "arkas_score": 0,
-  "market_structure": "",
+  "strategy_applied": "MULTI_TF|SMC|SMC_PA_HYBRID|PRICE_ACTION|AUDIT",
+  "structure": "",
   "trend": "",
   "liquidity": "",
   "bos": "",
@@ -1128,1059 +610,269 @@ Le JSON doit respecter cette structure :
   "fvg": "",
   "support": "",
   "resistance": "",
+  "primary_scenario": "",
+  "alternative_scenario": "",
+  "invalidation": "",
   "reason": "",
-  "invalidation": ""
+  "confluence_status": "ALIGNED|PARTIAL|DISAGREEMENT|NEUTRAL",
+  "timeframes_analyzed": [],
+  "tf_analysis": [
+    {
+      "image_index": 1,
+      "timeframe": "H4",
+      "bias": "BUY|SELL|NEUTRAL",
+      "structure": "",
+      "key_zone": ""
+    }
+  ],
+  "zones": [
+    {
+      "id": "A",
+      "type": "BUY_LIMIT|SELL_LIMIT|BUY_NOW|SELL_NOW",
+      "zone_label": "",
+      "zone_price": "",
+      "entry": 0,
+      "sl": 0,
+      "tp1": 0,
+      "tp2": 0,
+      "tp3": 0,
+      "rr": 0,
+      "priority": 1
+    }
+  ],
+  "risk_management": {
+    "risk_percent": "1%",
+    "recommendation": ""
+  },
+  "economic_news": "Non disponible",
+  "risk_warning": ""
 }
 
-Si WAIT :
+Si WAIT, mets les niveaux à null.
 
-{
-  "action": "WAIT",
-  "direction": "WAIT",
-  "entry": null,
-  "sl": null,
-  "tp1": null,
-  "tp2": null,
-  "tp3": null,
-  "rr": null,
-  "confidence_percent": 0,
-  "arkas_score": 0,
-  "market_structure": "",
-  "trend": "",
-  "liquidity": "",
-  "bos": "",
-  "choch": "",
-  "order_block": "",
-  "fvg": "",
-  "support": "",
-  "resistance": "",
-  "reason": "",
-  "invalidation": ""
-}
+Réponds UNIQUEMENT avec ce JSON.
 `;
 
-    return (
-        base +
-        modeInstructions +
-        extra +
-        schemaExample
-    );
+    return base + modeInstructions + extra + schema;
 }
 
 
-// ============================================================
-// SCHÉMA STRUCTURED OUTPUT
-// ============================================================
+/* ============================================================
+   MIME TYPE
+   ============================================================ */
 
-function buildResponseSchema() {
-
-    return {
-
-        type: "OBJECT",
-
-        properties: {
-
-            action: {
-                type: "STRING",
-                enum: [
-                    "BUY NOW",
-                    "SELL NOW",
-                    "BUY LIMIT",
-                    "SELL LIMIT",
-                    "WAIT"
-                ]
-            },
-
-            direction: {
-                type: "STRING",
-                enum: [
-                    "BUY",
-                    "SELL",
-                    "WAIT"
-                ]
-            },
-
-            entry: {
-                type: "NUMBER",
-                nullable: true
-            },
-
-            sl: {
-                type: "NUMBER",
-                nullable: true
-            },
-
-            tp1: {
-                type: "NUMBER",
-                nullable: true
-            },
-
-            tp2: {
-                type: "NUMBER",
-                nullable: true
-            },
-
-            tp3: {
-                type: "NUMBER",
-                nullable: true
-            },
-
-            rr: {
-                type: "NUMBER",
-                nullable: true
-            },
-
-            confidence_percent: {
-                type: "NUMBER"
-            },
-
-            arkas_score: {
-                type: "NUMBER"
-            },
-
-            market_structure: {
-                type: "STRING"
-            },
-
-            trend: {
-                type: "STRING"
-            },
-
-            liquidity: {
-                type: "STRING"
-            },
-
-            bos: {
-                type: "STRING"
-            },
-
-            choch: {
-                type: "STRING"
-            },
-
-            order_block: {
-                type: "STRING"
-            },
-
-            fvg: {
-                type: "STRING"
-            },
-
-            support: {
-                type: "STRING"
-            },
-
-            resistance: {
-                type: "STRING"
-            },
-
-            reason: {
-                type: "STRING"
-            },
-
-            invalidation: {
-                type: "STRING"
-            }
-        },
-
-        required: [
-            "action",
-            "direction",
-            "confidence_percent",
-            "arkas_score",
-            "market_structure",
-            "trend",
-            "liquidity",
-            "bos",
-            "choch",
-            "order_block",
-            "fvg",
-            "support",
-            "resistance",
-            "reason",
-            "invalidation"
-        ]
-    };
-}
-
-
-// ============================================================
-// MIME TYPE
-// ============================================================
-
-function normalizeMimeType(
-    mimeType
-) {
-
-    const value =
-        String(
-            mimeType ||
-            "image/jpeg"
-        )
-        .toLowerCase()
-        .trim();
-
-    if (
-        value ===
-        "image/jpg"
-    ) {
-
-        return "image/jpeg";
-    }
-
-    if (
-        value ===
-        "jpeg"
-    ) {
-
-        return "image/jpeg";
-    }
-
-    if (
-        value ===
-        "jpg"
-    ) {
-
-        return "image/jpeg";
-    }
-
-    if (
-        value ===
-        "png"
-    ) {
-
-        return "image/png";
-    }
-
-    if (
-        value ===
-        "webp"
-    ) {
-
-        return "image/webp";
-    }
-
+function normalizeMimeType(mimeType) {
+    const value = String(mimeType || "image/jpeg").toLowerCase().trim();
+    if (value === "image/jpg" || value === "jpeg" || value === "jpg") return "image/jpeg";
+    if (value === "png") return "image/png";
+    if (value === "webp") return "image/webp";
     return value;
 }
 
 
-// ============================================================
-// NETTOYAGE BASE64
-// ============================================================
+/* ============================================================
+   NETTOYAGE BASE64
+   ============================================================ */
 
-function cleanBase64(
-    value
-) {
-
-    let result =
-        String(
-            value || ""
-        ).trim();
-
-    /*
-     * Si le frontend envoie :
-     *
-     * data:image/png;base64,AAAA...
-     *
-     * on retire le préfixe.
-     */
-
-    if (
-        result.startsWith(
-            "data:"
-        )
-    ) {
-
-        const comma =
-            result.indexOf(",");
-
-        if (
-            comma !== -1
-        ) {
-
-            result =
-                result.substring(
-                    comma + 1
-                );
-        }
+function cleanBase64(value) {
+    let result = String(value || "").trim();
+    if (result.startsWith("data:")) {
+        const comma = result.indexOf(",");
+        if (comma !== -1) result = result.substring(comma + 1);
     }
-
-    /*
-     * Retirer espaces et retours ligne.
-     */
-
-    result =
-        result.replace(
-           (/\s+/g),
-            ""
-        );
-
-    return result;
+    return result.replace(/\s+/g, "");
 }
 
 
-// ============================================================
-// EXTRACTION TEXTE GEMINI
-// ============================================================
+/* ============================================================
+   EXTRACTION TEXTE
+   ============================================================ */
 
-function extractGeminiText(
-    candidate
-) {
-
-    if (
-        !candidate ||
-        !candidate.content ||
-        !Array.isArray(
-            candidate.content.parts
-        )
-    ) {
-
-        return "";
-    }
-
+function extractGeminiText(candidate) {
+    if (!candidate || !candidate.content || !Array.isArray(candidate.content.parts)) return "";
     return candidate.content.parts
-        .map(
-            part =>
-                typeof part.text === "string"
-                    ? part.text
-                    : ""
-        )
+        .map(part => (typeof part.text === "string" ? part.text : ""))
         .join("")
         .trim();
 }
 
 
-// ============================================================
-// PARSING JSON
-// ============================================================
+/* ============================================================
+   PARSING JSON
+   ============================================================ */
 
-function parseGeminiJSON(
-    text
-) {
-
-    let clean =
-        String(
-            text || ""
-        ).trim();
-
-    /*
-     * Retirer éventuellement ```json
-     */
-
-    clean =
-        clean.replace(
-            /^```json\s*/i,
-            ""
-        );
-
-    clean =
-        clean.replace(
-            /^```\s*/i,
-            ""
-        );
-
-    clean =
-        clean.replace(
-            /\s*```$/i,
-            ""
-        );
-
-    /*
-     * Première tentative
-     */
+function parseGeminiJSON(text) {
+    let clean = String(text || "").trim()
+        .replace(/^```json\s*/i, "")
+        .replace(/^```\s*/i, "")
+        .replace(/\s*```$/i, "");
 
     try {
-
-        return JSON.parse(
-            clean
-        );
-
+        return JSON.parse(clean);
     } catch (error) {
-
-        /*
-         * Chercher le premier objet JSON.
-         */
-
-        const first =
-            clean.indexOf("{");
-
-        const last =
-            clean.lastIndexOf("}");
-
-        if (
-            first === -1 ||
-            last === -1 ||
-            last <= first
-        ) {
-
-            throw error;
-        }
-
-        const possible =
-            clean.substring(
-                first,
-                last + 1
-            );
-
-        return JSON.parse(
-            possible
-        );
+        const first = clean.indexOf("{");
+        const last = clean.lastIndexOf("}");
+        if (first === -1 || last === -1 || last <= first) throw error;
+        return JSON.parse(clean.substring(first, last + 1));
     }
 }
 
 
-// ============================================================
-// NORMALISATION
-// ============================================================
+/* ============================================================
+   NORMALISATION
+   ============================================================ */
 
-function normalizeResult(
-    data,
-    context
-) {
+function normalizeResult(data, context) {
 
-    const action =
-        normalizeAction(
-            data.action ||
-            data.signal
-        );
+    const action = normalizeAction(data.action || data.signal);
 
-    let direction =
-        String(
-            data.direction ||
-            ""
-        )
-        .toUpperCase()
-        .trim();
-
-    if (
-        direction !== "BUY" &&
-        direction !== "SELL"
-    ) {
-
-        if (
-            action.startsWith(
-                "BUY"
-            )
-        ) {
-
-            direction =
-                "BUY";
-
-        } else if (
-            action.startsWith(
-                "SELL"
-            )
-        ) {
-
-            direction =
-                "SELL";
-
-        } else {
-
-            direction =
-                "WAIT";
-        }
+    let direction = String(data.direction || "").toUpperCase().trim();
+    if (direction !== "BUY" && direction !== "SELL") {
+        if (action.startsWith("BUY")) direction = "BUY";
+        else if (action.startsWith("SELL")) direction = "SELL";
+        else direction = "WAIT";
     }
-
-    /*
-     * WAIT ne doit jamais avoir de niveaux
-     */
-
-    if (
-        action === "WAIT"
-    ) {
-
-        direction =
-            "WAIT";
-    }
+    if (action === "WAIT") direction = "WAIT";
 
     return {
-
-        action:
-            action,
-
-        direction:
-            direction,
-
-        entry:
-            normalizeNumber(
-                data.entry
-            ),
-
-        sl:
-            normalizeNumber(
-                data.sl
-            ),
-
-        tp1:
-            normalizeNumber(
-                data.tp1
-            ),
-
-        tp2:
-            normalizeNumber(
-                data.tp2
-            ),
-
-        tp3:
-            normalizeNumber(
-                data.tp3
-            ),
-
-        rr:
-            normalizeNumber(
-                data.rr
-            ),
-
-        confidence_percent:
-            clamp(
-                normalizeNumber(
-                    data.confidence_percent
-                ) || 0,
-                0,
-                100
-            ),
-
-        arkas_score:
-            clamp(
-                normalizeNumber(
-                    data.arkas_score
-                ) || 0,
-                0,
-                100
-            ),
-
-        market_structure:
-            safeText(
-                data.market_structure
-            ),
-
-        trend:
-            safeText(
-                data.trend
-            ),
-
-        liquidity:
-            safeText(
-                data.liquidity
-            ),
-
-        bos:
-            safeText(
-                data.bos
-            ),
-
-        choch:
-            safeText(
-                data.choch
-            ),
-
-        order_block:
-            safeText(
-                data.order_block
-            ),
-
-        fvg:
-            safeText(
-                data.fvg
-            ),
-
-        support:
-            safeText(
-                data.support
-            ),
-
-        resistance:
-            safeText(
-                data.resistance
-            ),
-
-        reason:
-            safeText(
-                data.reason
-            ),
-
-        invalidation:
-            safeText(
-                data.invalidation
-            ),
-
-        asset:
-            context.asset,
-
-        timeframe:
-            context.timeframe,
-
-        market_type:
-            context.marketType
+        signal: action,
+        action: action,
+        direction: direction,
+        entry: normalizeNumber(data.entry),
+        sl: normalizeNumber(data.sl),
+        tp1: normalizeNumber(data.tp1),
+        tp2: normalizeNumber(data.tp2),
+        tp3: normalizeNumber(data.tp3),
+        rr: normalizeNumber(data.rr),
+        confidence_percent: clamp(normalizeNumber(data.confidence_percent) || 0, 0, 100),
+        arkas_score: clamp(normalizeNumber(data.arkas_score) || 0, 0, 100),
+        strategy_applied: safeText(data.strategy_applied) || (context.mode === "multi-tf" ? "MULTI_TF" : "SMC"),
+        structure: safeText(data.structure || data.market_structure),
+        trend: safeText(data.trend),
+        liquidity: safeText(data.liquidity),
+        bos: safeText(data.bos),
+        choch: safeText(data.choch),
+        order_block: safeText(data.order_block),
+        fvg: safeText(data.fvg),
+        support: safeText(data.support),
+        resistance: safeText(data.resistance),
+        primary_scenario: safeText(data.primary_scenario),
+        alternative_scenario: safeText(data.alternative_scenario),
+        invalidation: safeText(data.invalidation),
+        reason: safeText(data.reason),
+        confluence_status: data.confluence_status || null,
+        timeframes_analyzed: Array.isArray(data.timeframes_analyzed) ? data.timeframes_analyzed : [],
+        tf_analysis: Array.isArray(data.tf_analysis) ? data.tf_analysis : [],
+        zones: normalizeZones(data.zones),
+        risk_management: data.risk_management || {},
+        economic_news: safeText(data.economic_news) || "Non disponible",
+        risk_warning: safeText(data.risk_warning)
     };
 }
 
 
-// ============================================================
-// ACTION
-// ============================================================
+/* ============================================================
+   ZONES
+   ============================================================ */
 
-function normalizeAction(
-    value
-) {
+function normalizeZones(zones) {
+    if (!Array.isArray(zones)) return [];
+    return zones.map((z, i) => ({
+        id: z.id || String.fromCharCode(65 + i),
+        type: String(z.type || "BUY_LIMIT").toUpperCase(),
+        zone_label: safeText(z.zone_label),
+        zone_price: safeText(z.zone_price),
+        entry: normalizeNumber(z.entry),
+        sl: normalizeNumber(z.sl),
+        tp1: normalizeNumber(z.tp1),
+        tp2: normalizeNumber(z.tp2),
+        tp3: normalizeNumber(z.tp3),
+        rr: normalizeNumber(z.rr),
+        priority: z.priority || (i + 1)
+    }));
+}
 
-    const action =
-        String(
-            value || ""
-        )
-        .toUpperCase()
-        .trim();
 
-    if (
-        action.includes(
-            "BUY LIMIT"
-        )
-    ) {
+/* ============================================================
+   ACTION
+   ============================================================ */
 
-        return "BUY LIMIT";
-    }
-
-    if (
-        action.includes(
-            "SELL LIMIT"
-        )
-    ) {
-
-        return "SELL LIMIT";
-    }
-
-    if (
-        action.includes(
-            "BUY NOW"
-        )
-    ) {
-
-        return "BUY NOW";
-    }
-
-    if (
-        action.includes(
-            "SELL NOW"
-        )
-    ) {
-
-        return "SELL NOW";
-    }
-
-    if (
-        action === "BUY"
-    ) {
-
-        return "BUY NOW";
-    }
-
-    if (
-        action === "SELL"
-    ) {
-
-        return "SELL NOW";
-    }
-
+function normalizeAction(value) {
+    const action = String(value || "").toUpperCase().trim();
+    if (action.includes("BUY LIMIT")) return "BUY LIMIT";
+    if (action.includes("SELL LIMIT")) return "SELL LIMIT";
+    if (action.includes("BUY NOW")) return "BUY NOW";
+    if (action.includes("SELL NOW")) return "SELL NOW";
+    if (action === "BUY") return "BUY NOW";
+    if (action === "SELL") return "SELL NOW";
     return "WAIT";
 }
 
 
-// ============================================================
-// NOMBRE
-// ============================================================
+/* ============================================================
+   NOMBRE
+   ============================================================ */
 
-function normalizeNumber(
-    value
-) {
-
-    if (
-        value === null ||
-        value === undefined ||
-        value === ""
-    ) {
-
-        return null;
-    }
-
-    if (
-        typeof value === "number"
-    ) {
-
-        return Number.isFinite(value)
-            ? value
-            : null;
-    }
-
-    let text =
-        String(
-            value
-        )
-        .trim();
-
-    /*
-     * Valeurs textuelles comme :
-     * "1.2450"
-     * "$1,245.50"
-     */
-
-    text =
-        text.replace(
-            /,/g,
-            "."
-        );
-
-    /*
-     * Garder uniquement nombre simple.
-     */
-
-    const match =
-        text.match(
-            /[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?/
-        );
-
-    if (!match) {
-        return null;
-    }
-
-    const number =
-        Number(
-            match[0]
-        );
-
-    return Number.isFinite(number)
-        ? number
-        : null;
+function normalizeNumber(value) {
+    if (value === null || value === undefined || value === "") return null;
+    if (typeof value === "number") return Number.isFinite(value) ? value : null;
+    let text = String(value).trim().replace(/,/g, ".");
+    const match = text.match(/[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?/);
+    if (!match) return null;
+    const number = Number(match[0]);
+    return Number.isFinite(number) ? number : null;
 }
 
 
-// ============================================================
-// VALIDATION
-// ============================================================
+/* ============================================================
+   VALIDATION
+   ============================================================ */
 
-function validateResult(
-    result
-) {
+function validateResult(result) {
 
-    if (
-        result.action === "WAIT"
-    ) {
+    if (result.action === "WAIT") return { valid: true };
 
-        return {
-            valid: true
-        };
+    if (result.direction !== "BUY" && result.direction !== "SELL") {
+        return { valid: false, message: "Direction BUY/SELL absente." };
     }
 
-    if (
-        result.direction !== "BUY" &&
-        result.direction !== "SELL"
-    ) {
-
-        return {
-            valid: false,
-            message:
-                "Direction BUY/SELL absente."
-        };
+    if (!Number.isFinite(result.entry) || !Number.isFinite(result.sl) || !Number.isFinite(result.tp1)) {
+        return { valid: false, message: "Entry, SL ou TP1 manquant." };
     }
 
-    if (
-        !Number.isFinite(
-            result.entry
-        ) ||
-        !Number.isFinite(
-            result.sl
-        ) ||
-        !Number.isFinite(
-            result.tp1
-        )
-    ) {
-
-        return {
-            valid: false,
-            message:
-                "Entry, SL ou TP1 manquant."
-        };
+    if (result.direction === "BUY") {
+        if (result.sl >= result.entry) return { valid: false, message: "BUY : SL doit être < Entry." };
+        if (result.tp1 <= result.entry) return { valid: false, message: "BUY : TP1 doit être > Entry." };
     }
 
-    /*
-     * BUY
-     */
-
-    if (
-        result.direction === "BUY"
-    ) {
-
-        if (
-            result.sl >=
-            result.entry
-        ) {
-
-            return {
-                valid: false,
-                message:
-                    "BUY : SL doit être inférieur à Entry."
-            };
-        }
-
-        if (
-            result.tp1 <=
-            result.entry
-        ) {
-
-            return {
-                valid: false,
-                message:
-                    "BUY : TP1 doit être supérieur à Entry."
-            };
-        }
-
-        if (
-            result.tp2 !== null &&
-            result.tp2 <=
-            result.tp1
-        ) {
-
-            return {
-                valid: false,
-                message:
-                    "BUY : TP2 doit être supérieur à TP1."
-            };
-        }
-
-        if (
-            result.tp3 !== null &&
-            result.tp2 !== null &&
-            result.tp3 <=
-            result.tp2
-        ) {
-
-            return {
-                valid: false,
-                message:
-                    "BUY : TP3 doit être supérieur à TP2."
-            };
-        }
+    if (result.direction === "SELL") {
+        if (result.sl <= result.entry) return { valid: false, message: "SELL : SL doit être > Entry." };
+        if (result.tp1 >= result.entry) return { valid: false, message: "SELL : TP1 doit être < Entry." };
     }
 
-    /*
-     * SELL
-     */
-
-    if (
-        result.direction === "SELL"
-    ) {
-
-        if (
-            result.sl <=
-            result.entry
-        ) {
-
-            return {
-                valid: false,
-                message:
-                    "SELL : SL doit être supérieur à Entry."
-            };
-        }
-
-        if (
-            result.tp1 >=
-            result.entry
-        ) {
-
-            return {
-                valid: false,
-                message:
-                    "SELL : TP1 doit être inférieur à Entry."
-            };
-        }
-
-        if (
-            result.tp2 !== null &&
-            result.tp2 >=
-            result.tp1
-        ) {
-
-            return {
-                valid: false,
-                message:
-                    "SELL : TP2 doit être inférieur à TP1."
-            };
-        }
-
-        if (
-            result.tp3 !== null &&
-            result.tp2 !== null &&
-            result.tp3 >=
-            result.tp2
-        ) {
-
-            return {
-                valid: false,
-                message:
-                    "SELL : TP3 doit être inférieur à TP2."
-            };
-        }
-    }
-
-    return {
-        valid: true
-    };
+    return { valid: true };
 }
 
 
-// ============================================================
-// CLASSIFICATION MARCHÉ
-// ============================================================
+/* ============================================================
+   CLASSIFICATION MARCHÉ
+   ============================================================ */
 
-function classifyMarket(
-    asset
-) {
+function classifyMarket(asset) {
+    const value = String(asset || "").toUpperCase().trim();
 
-    const value =
-        String(
-            asset || ""
-        )
-        .toUpperCase()
-        .trim();
+    if (value.includes("XAU") || value.includes("GOLD")) return "GOLD";
 
-    /*
-     * GOLD
-     */
+    const cryptoSymbols = ["BTC", "ETH", "LTC", "XRP", "SOL", "BNB", "ADA", "DOGE"];
+    if (cryptoSymbols.some(s => value.includes(s))) return "CRYPTO";
 
-    if (
-        value.includes("XAU") ||
-        value.includes("GOLD")
-    ) {
+    const forexSymbols = ["EURUSD", "GBPUSD", "USDJPY", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD"];
+    if (forexSymbols.some(s => value.includes(s))) return "FOREX";
 
-        return "GOLD";
-    }
+    const indices = ["US30", "NAS100", "SPX500", "GER40", "DAX", "UK100"];
+    if (indices.some(s => value.includes(s))) return "INDICES";
 
-    /*
-     * CRYPTO
-     */
-
-    const cryptoSymbols = [
-
-        "BTC",
-        "ETH",
-        "LTC",
-        "XRP",
-        "SOL",
-        "BNB",
-        "ADA",
-        "DOGE",
-        "DOT",
-        "AVAX",
-        "LINK",
-        "TRX",
-        "MATIC",
-        "SHIB",
-        "ATOM",
-        "UNI",
-        "ETC",
-        "BCH",
-        "XLM",
-        "NEAR",
-        "APT",
-        "ARB",
-        "OP"
-    ];
-
-    if (
-        cryptoSymbols.some(
-            symbol =>
-                value.includes(
-                    symbol
-                )
-        )
-    ) {
-
-        return "CRYPTO";
-    }
-
-    /*
-     * FOREX
-     */
-
-    const forexSymbols = [
-
-        "EURUSD",
-        "GBPUSD",
-        "USDJPY",
-        "USDCHF",
-        "AUDUSD",
-        "USDCAD",
-        "NZDUSD",
-        "EURJPY",
-        "GBPJPY",
-        "EURGBP",
-        "EURCHF",
-        "AUDJPY",
-        "CADJPY",
-        "CHFJPY"
-    ];
-
-    if (
-        forexSymbols.some(
-            symbol =>
-                value.includes(
-                    symbol
-                )
-        )
-    ) {
-
-        return "FOREX";
-    }
-
-    /*
-     * INDICES
-     */
-
-    const indices = [
-        "US30",
-        "NAS100",
-        "NASDAQ",
-        "SPX500",
-        "SP500",
-        "GER40",
-        "DAX",
-        "UK100"
-    ];
-
-    if (
-        indices.some(
-            symbol =>
-                value.includes(
-                    symbol
-                )
-        )
-    ) {
-
-        return "INDICES";
-    }
-
-    /*
-     * SYNTHETIC
-     */
-
-    if (
-        value.includes(
-            "VOLATILITY"
-        ) ||
-        /^R_\d+$/.test(
-            value
-        ) ||
-        value.includes(
-            "BOOM"
-        ) ||
-        value.includes(
-            "CRASH"
-        ) ||
-        value.includes(
-            "JUMP"
-        )
-    ) {
-
+    if (value.includes("VOLATILITY") || /^R_\d+$/.test(value) || value.includes("BOOM") || value.includes("CRASH")) {
         return "SYNTHETIC";
     }
 
@@ -2188,209 +880,81 @@ function classifyMarket(
 }
 
 
-// ============================================================
-// TEXTE SÛR
-// ============================================================
+/* ============================================================
+   UTILITAIRES
+   ============================================================ */
 
-function safeText(
-    value
-) {
+function safeText(value) {
+    if (value === null || value === undefined) return "";
+    return String(value).trim();
+}
 
-    if (
-        value === null ||
-        value === undefined
-    ) {
-
-        return "";
-    }
-
-    return String(
-        value
-    ).trim();
+function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
 }
 
 
-// ============================================================
-// CLAMP
-// ============================================================
+/* ============================================================
+   ERREURS HTTP GEMINI
+   ============================================================ */
 
-function clamp(
-    value,
-    min,
-    max
-) {
+function handleGeminiHttpError(res, status, data) {
+    const apiError = data && data.error ? data.error : null;
+    const message = apiError?.message || "Erreur retournée par Gemini.";
 
-    return Math.min(
-        Math.max(
-            value,
-            min
-        ),
-        max
-    );
-}
-
-
-// ============================================================
-// ERREURS HTTP GEMINI
-// ============================================================
-
-function handleGeminiHttpError(
-    res,
-    status,
-    data
-) {
-
-    const apiError =
-        data &&
-        data.error
-            ? data.error
-            : null;
-
-    const message =
-        apiError?.message ||
-        "Erreur retournée par Gemini.";
-
-    const code =
-        apiError?.status ||
-        null;
-
-    /*
-     * API KEY
-     */
-
-    if (
-        status === 401 ||
-        status === 403
-    ) {
-
+    if (status === 401 || status === 403) {
         return res.status(status).json({
-
             success: false,
-
-            error:
-                "GEMINI_AUTH_ERROR",
-
-            message:
-                "La clé Gemini est invalide, absente ou non autorisée.",
-
-            details:
-                message,
-
-            status:
-                status
+            error: "GEMINI_AUTH_ERROR",
+            message: "Clé Gemini invalide ou non autorisée.",
+            details: message
         });
     }
 
-    /*
-     * QUOTA
-     */
-
-    if (
-        status === 429
-    ) {
-
+    if (status === 429) {
         return res.status(429).json({
-
             success: false,
-
-            error:
-                "GEMINI_QUOTA",
-
-            message:
-                "La limite ou le quota Gemini a été atteint.",
-
-            details:
-                message
+            error: "GEMINI_QUOTA",
+            message: "Quota Gemini atteint.",
+            details: message
         });
     }
 
-    /*
-     * MODÈLE
-     */
-
-    if (
-        status === 404
-    ) {
-
+    if (status === 404) {
         return res.status(404).json({
-
             success: false,
-
-            error:
-                "GEMINI_MODEL_ERROR",
-
-            message:
-                "Le modèle Gemini demandé n'est pas disponible pour cette API key.",
-
-            model:
-                "gemini-3.6-flash",
-
-            details:
-                message
+            error: "GEMINI_MODEL_ERROR",
+            message: "Modèle Gemini indisponible.",
+            model: "gemini-3.6-flash",
+            details: message
         });
     }
 
     return res.status(502).json({
-
         success: false,
-
-        error:
-            "GEMINI_API_ERROR",
-
-        message:
-            "Gemini a retourné une erreur.",
-
-        details:
-            message,
-
-        status:
-            status,
-
-        code:
-            code
+        error: "GEMINI_API_ERROR",
+        message: "Gemini a retourné une erreur.",
+        details: message,
+        status: status
     });
 }
 
 
-// ============================================================
-// MESSAGE DE BLOCAGE LISIBLE
-// ============================================================
+/* ============================================================
+   MESSAGE BLOCAGE
+   ============================================================ */
 
-function buildFriendlyBlockMessage(
-    reason
-) {
-
-    switch (
-        String(
-            reason || ""
-        ).toUpperCase()
-    ) {
-
+function buildFriendlyBlockMessage(reason) {
+    switch (String(reason || "").toUpperCase()) {
         case "SAFETY":
-            return (
-                "La demande a été bloquée par les contrôles de sécurité. " +
-                "Essaie une capture claire du graphique sans contenu supplémentaire."
-            );
-
+            return "Bloqué par les contrôles de sécurité. Essaie une capture claire du graphique.";
         case "BLOCKLIST":
-            return (
-                "La demande contient un élément bloqué par les règles Gemini."
-            );
-
+            return "La demande contient un élément bloqué.";
         case "PROHIBITED_CONTENT":
-            return (
-                "Le contenu envoyé ne peut pas être analysé par Gemini."
-            );
-
+            return "Le contenu ne peut pas être analysé.";
         case "SPII":
-            return (
-                "La capture semble contenir des informations personnelles sensibles."
-            );
-
+            return "La capture contient des informations sensibles.";
         default:
-            return (
-                "Gemini a bloqué la demande. " +
-                "Consulte la raison retournée par l'API."
-            );
+            return "Gemini a bloqué la demande.";
     }
 }

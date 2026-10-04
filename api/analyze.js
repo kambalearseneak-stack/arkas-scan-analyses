@@ -159,7 +159,7 @@ export default async function handler(req, res) {
            MODÈLE + ENDPOINT
            ==================================================== */
 
-        const model = "gemini-1.5-flash-exp";
+        const model = "gemini-1.5-flash";
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
         /* ====================================================

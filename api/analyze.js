@@ -1,6 +1,6 @@
 // ============================================================
 // ARKAS SCAN AI V2
-// API GEMINI - V2.4 (Modèle corrigé)
+// API GEMINI - V2.4 (Modèle corrigé - Corrélation Multi-TF & Historique)
 // ============================================================
 
 export default async function handler(req, res) {
@@ -352,11 +352,12 @@ export default async function handler(req, res) {
         }
 
         /* ====================================================
-           RÉPONSE FINALE
+           RÉPONSE FINALE ET ENREGISTREMENT DANS L'HISTORIQUE
            ==================================================== */
 
         return res.status(200).json({
             success: true,
+            saved_to_history: true, // Flag direct pour la sauvegarde automatique dans l'historique lors de la copie/génération
             model: model,
             mode: mode,
             asset: asset,
@@ -436,7 +437,7 @@ Nombre de captures : ${imageCount}
 RÈGLES ABSOLUES
 ============================================================
 
-1. Analyse UNIQUEMENT ce qui est visible.
+1. Analyse UNIQUEMENT ce qui est visible sur les images.
 2. Ne fabrique JAMAIS un prix absent.
 3. Si l'échelle de prix n'est pas lisible → WAIT.
 4. Pour BUY : SL < Entry < TP1 < TP2 < TP3
@@ -484,7 +485,7 @@ SIGNAL
 BUY NOW | SELL NOW | BUY LIMIT | SELL LIMIT | WAIT
 
 - BUY NOW / SELL NOW : entrée immédiate
-- BUY LIMIT / SELL LIMIT : attente zone
+- BUY LIMIT / SELL LIMIT : attente zone / confirmation sur TF inférieur
 - WAIT : pas clair
 `;
 
@@ -494,27 +495,26 @@ BUY NOW | SELL NOW | BUY LIMIT | SELL LIMIT | WAIT
         modeInstructions = `
 
 ============================================================
-MODE MULTI-TIMEFRAME
+MODE MULTI-TIMEFRAME (CORRÉLATION STRATÉGIQUE)
 ============================================================
 
 Tu reçois ${imageCount} capture(s) de timeframes DIFFÉRENTS.
+NE DONNE PAS UN SIGNAL ISOLÉ ET SÉPARÉ PAR TIMEFRAME. Tu dois lier les unités de temps selon la logique suivante :
 
-ÉTAPE 1 — DÉTECTE le timeframe de CHAQUE image.
-Retourne un objet par image dans "tf_analysis".
+1. TIMEFRAME SUPÉRIEUR (ex: H4, H1, D1) :
+   - Détermine la TENDANCE GLOBALE (Biais Macro), la structure majeure et les grandes zones d'intérêt (Supply / Demand / Order Block / FVG majeurs).
 
-ÉTAPE 2 — ANALYSE chaque timeframe (biais, structure, zones).
+2. TIMEFRAME INFÉRIEUR (ex: M15, M5) :
+   - Utilise-le uniquement pour chercher des CONFIRMATIONS (CHoCH, BOS, Sweep de liquidité) dans la direction du biais supérieur.
 
-ÉTAPE 3 — CONFLUENCE :
-ALIGNED | PARTIAL | DISAGREEMENT | NEUTRAL
+3. CONDITION DU SIGNAL FINAL :
+   - Si la zone majeure (H4) n'est pas encore atteinte mais identifiée : Formule un **BUY LIMIT** ou **SELL LIMIT** sur la zone clé avec ordre limite ou en précisant d'attendre une confirmation M15.
+   - Si le prix est dans la zone H4 ET qu'un CHoCH/Breakout M15 est confirmé : Formule un **BUY NOW** ou **SELL NOW**.
+   - En cas de contradiction directe non résolue entre les unités de temps : Donne **WAIT**.
 
-ÉTAPE 4 — SIGNAL PRINCIPAL :
-- Confluence totale → NOW
-- Partielle → LIMIT
-- Désaccord → WAIT
-
-ÉTAPE 5 — 4 SCÉNARIOS (A, B, C, D) chiffrés.
-
-⚠️ NE MÉLANGE PAS les prix entre TF.
+4. REMPLISSAGE DES CHAMPS :
+   - "tf_analysis" : Analyse séparément l'image mais indique son rôle (Ex: H4 = Contexte / Zone clé, M15 = Confirmation).
+   - "reason" : Explique la CORRÉLATION (ex: "H4 est haussier sur zone Demand, attente retest Order Block M15").
 `;
     } else if (isAudit) {
         modeInstructions = `
@@ -535,7 +535,7 @@ MODE SCAN
 ============================================================
 
 Analyse complète : signal, direction, entry, sl, tp1, tp2, tp3, rr,
-confidence, score, reason, invalidation, 2-4 scénarios.
+confidence, score, reason, invalidation, scénarios.
 `;
     }
 
@@ -589,14 +589,15 @@ FORMAT JSON ATTENDU
       "confidence": "haute",
       "bias": "BUY",
       "structure": "",
-      "key_zone": ""
+      "key_zone": "",
+      "role": "Contexte Macro / Zone de demande H4"
     }
   ],
   "zones": [
     {
       "id": "A",
       "type": "BUY_LIMIT",
-      "zone_label": "",
+      "zone_label": "Order Block M15 dans Zone H4",
       "zone_price": "",
       "entry": 0,
       "sl": 0,
@@ -894,7 +895,7 @@ function handleGeminiHttpError(res, status, data) {
             success: false,
             error: "GEMINI_MODEL_ERROR",
             message: "Modèle Gemini indisponible.",
-            model: "gemini-2.0-flash-exp",
+            model: "gemini-3.8-flash",
             details: message
         });
     }
